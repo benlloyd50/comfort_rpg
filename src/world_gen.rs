@@ -7,11 +7,11 @@ use iyes_loopless::prelude::*;
 
 use crate::{assets::SpriteAssets, AppState};
 
-const MAP_SIZE_X: u32 = 128; //Size of map currently only supports square maps
-const MAP_SIZE_Y: u32 = 128; //Size of map currently only supports square maps
-const TILE_PIXELS_X: f32 = 8f32;
-const TILE_PIXELS_Y: f32 = 8f32;
-const Z_FLOOR: f32 = 0f32; // Generally the lowest depth in terms of sprites
+pub const MAP_SIZE_X: u32 = 128; //Size of map currently only supports square maps
+pub const MAP_SIZE_Y: u32 = 128; //Size of map currently only supports square maps
+pub const TILE_PIXELS_X: f32 = 8f32;
+pub const TILE_PIXELS_Y: f32 = 8f32;
+pub const Z_FLOOR: f32 = 0f32; // Generally the lowest depth in terms of sprites
 
 pub struct WorldGenerationPlugin;
 
@@ -35,7 +35,7 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
 
     // Spawn the elements of the tilemaps.
     spawn_grass_bottom(&mut commands, &mut tile_storage, tilemap_entity);
-    spawn_trees(&mut commands, &tiles, seed);
+    spawn_trees(&mut commands, &tiles, &mut tile_storage, seed);
 
     let tile_size = TilemapTileSize {
         x: TILE_PIXELS_X,
@@ -52,7 +52,6 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
         texture: TilemapTexture::Single(tiles.grass_tiles.clone()),
         tile_size,
         transform: Transform::from_translation(Vec3::ZERO),
-        // transform: get_tilemap_center_transform(&tilemap_size, &grid_size, &map_type, Z_FLOOR),
         ..Default::default()
     });
     println!("World Created succesfully");
@@ -75,57 +74,63 @@ fn spawn_grass_bottom(commands: &mut Commands, storage: &mut TileStorage, map_en
                     tilemap_id: TilemapId(map_entity),
                     texture_index: TileTextureIndex(tile_index),
                     ..Default::default()
-                }).id();
+                })
+                .id();
             storage.set(&tile_pos, tile_entity);
         }
     }
 }
 
-fn spawn_trees(commands: &mut Commands, tiles: &Res<SpriteAssets>, seed: u64) {
+fn spawn_trees(commands: &mut Commands, tiles: &Res<SpriteAssets>, tile_storage: &mut TileStorage, seed: u64) {
     let noise = tree_perlin(seed);
-
+    
     for x in 0..MAP_SIZE_X {
         for y in (0..MAP_SIZE_Y).step_by(2) {
             //works well but does not allow for staggering of trees
             let tile_pos = TilePos { x, y };
             let world_pos = tile_pos_to_world_pos(tile_pos) - Vec2::new(TILE_PIXELS_X / 2f32, 0f32);
-
+    
             let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
             perlin_value = (perlin_value + 1.0) * 0.5;
-
+    
             if perlin_value < 0.2f32 || perlin_value > 0.6f32 {
-                commands.spawn((SpriteSheetBundle {
-                    texture_atlas: tiles.tree.clone(),
-                    sprite: TextureAtlasSprite {
-                        index: 0,
+                commands.spawn((
+                    SpriteSheetBundle {
+                        texture_atlas: tiles.tree.clone(),
+                        sprite: TextureAtlasSprite {
+                            index: 0,
+                            ..default()
+                        },
+                        transform: Transform::from_translation(Vec3 {
+                            x: world_pos.x,
+                            y: world_pos.y,
+                            z: Z_FLOOR + 1.0,
+                        }),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3 {
-                        x: world_pos.x,
-                        y: world_pos.y,
-                        z: Z_FLOOR + 1.0,
-                    }),
-                    ..default()
-                },
-                Tree,
-                TilePos{x, y},
-                Blocking::Double(TilePos{x, y}, TilePos{x, y: y + 1})));
+                    Tree,
+                ));
+                // update the tilemap entities with a marker component to block
+                let tile1 = tile_storage.get(&tile_pos).unwrap();
+                let tile2 = tile_storage.get(&TilePos {x: tile_pos.x, y: tile_pos.y + 1}).unwrap();
+                commands.entity(tile1).insert(Blocking);
+                commands.entity(tile2).insert(Blocking);
             }
         }
     }
 }
 
-fn stretch_tree(mut tree_q: Query<(&mut Transform, &TilePos), With<Tree>>, keeb: Res<Input<KeyCode>>) {
+fn stretch_tree(
+    mut tree_q: Query<(&mut Transform, &TilePos), With<Tree>>,
+    keeb: Res<Input<KeyCode>>,
+) {
     if keeb.pressed(KeyCode::K) {
         for (mut transform, _) in tree_q.iter_mut() {
             transform.scale.x += 0.06;
-
         }
-    }
-    else if keeb.pressed(KeyCode::J) {
+    } else if keeb.pressed(KeyCode::J) {
         for (mut transform, _) in tree_q.iter_mut() {
             transform.scale.x -= 0.06;
-
         }
     }
 }
@@ -156,13 +161,9 @@ fn tilesize_pixels() -> TilemapGridSize {
     }
 }
 
-// Defines the tiles that the entity blocks
+// Marks a tile as blocking 
 #[derive(Component)]
-enum Blocking {
-    _Single(TilePos),            // Blocks a single tile
-    Double(TilePos, TilePos),   // Blocks two tiles in 2 unrelated positions
-    _Rect(u32, u32, u32, u32),   // Blocks a filled rectangle of positions
-}
+pub struct Blocking;
 
 
 //=====> Terrain Components

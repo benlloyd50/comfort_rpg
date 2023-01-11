@@ -1,3 +1,5 @@
+mod entity_tile_pos;
+
 mod assets;
 use assets::AssetLoadPlugin;
 mod world_gen;

@@ -1,4 +1,4 @@
-// use super::player::Player;
+use crate::player::Player;
 use crate::AppState;
 use bevy::{input::mouse::MouseWheel, prelude::*};
 use iyes_loopless::prelude::*;
@@ -13,6 +13,8 @@ impl Plugin for CameraPlugin {
             .add_system_set(
                 ConditionSet::new()
                     .run_in_state(AppState::Running)
+                    .label("graphicDelay")
+                    .after("graphic")
                     .with_system(zoom_camera)
                     .with_system(camera_follow_player)
                     .into(),
@@ -34,28 +36,20 @@ fn load_camera(mut commands: Commands) {
                 },
                 ..default()
             },
-            CamScrollLock(true),
+            CamScrollLock(false),
         ))
         .id();
     println!("Camera loaded succesfully");
 }
 
-fn camera_follow_player(keyboard_input: Res<Input<KeyCode>>, time: Res<Time>, mut camera: Query<(&mut Transform, &Camera2d)>) {
-    let (mut cam_pos, _) = camera.single_mut();
+fn camera_follow_player(
+    mut camera: Query<&mut Transform, With<Camera2d>>,
+    player_q: Query<&Transform, (With<Player>, Without<Camera2d>)>,
+) {
+    let mut cam_pos = camera.single_mut();
+    let player_pos = player_q.single();
 
-    let speed_multiplier = time.delta_seconds() * 120f32;
-    if keyboard_input.pressed(KeyCode::A) {
-        cam_pos.translation.x -= 1.0 * speed_multiplier;
-    }
-    if keyboard_input.pressed(KeyCode::D) {
-        cam_pos.translation.x += 1.0 * speed_multiplier;
-    }
-    if keyboard_input.pressed(KeyCode::W) {
-        cam_pos.translation.y += 1.0 * speed_multiplier;
-    }
-    if keyboard_input.pressed(KeyCode::S) {
-        cam_pos.translation.y -= 1.0 * speed_multiplier;
-    } 
+    cam_pos.translation = player_pos.translation;
 }
 
 // fn camera_follow_player(
@@ -89,7 +83,5 @@ fn zoom_camera(
     for direction in scroll_wheel.iter() {
         cam.scale = (cam.scale + zoom_scroll_speed * direction.y)
             .clamp(Vec3::new(0.2, 0.2, 0.2), Vec3::new(6.0, 6.0, 6.0));
-            // TODO: get from a config file
-            // .clamp(Vec3::new(0.2, 0.2, 0.2), Vec3::new(2.0, 2.0, 2.0));
     }
 }
