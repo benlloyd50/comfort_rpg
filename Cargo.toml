@@ -1,0 +1,23 @@
+[package]
+name = "comfort_rpg"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.9"
+bevy_asset_loader = { version = "0.14", features = ["2d", "stageless"]}
+bevy_ecs_tilemap = "0.9"
+iyes_loopless = "0.9.1"
+rand = "0.8.5"
+bracket-noise = "0.8"
+
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
