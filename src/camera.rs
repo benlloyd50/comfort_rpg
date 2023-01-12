@@ -9,16 +9,15 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, load_camera)
-            .add_system_set(
-                ConditionSet::new()
-                    .run_in_state(AppState::Running)
-                    .label("graphicDelay")
-                    .after("graphic")
-                    .with_system(zoom_camera)
-                    .with_system(camera_follow_player)
-                    .into(),
-            );
+        app.add_enter_system(AppState::GameLoading, load_camera).add_system_set(
+            ConditionSet::new()
+                .run_in_state(AppState::Running)
+                .label("graphicDelay")
+                .after("graphic")
+                .with_system(zoom_camera)
+                .with_system(camera_follow_player)
+                .into(),
+        );
     }
 }
 
@@ -81,7 +80,7 @@ fn zoom_camera(
 
     let zoom_scroll_speed = 0.05;
     for direction in scroll_wheel.iter() {
-        cam.scale = (cam.scale + zoom_scroll_speed * direction.y)
-            .clamp(Vec3::new(0.2, 0.2, 0.2), Vec3::new(6.0, 6.0, 6.0));
+        cam.scale =
+            (cam.scale + zoom_scroll_speed * direction.y).clamp(Vec3::new(0.2, 0.2, 0.2), Vec3::new(6.0, 6.0, 6.0));
     }
 }

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
@@ -6,14 +8,19 @@ use crate::{assets::SpriteAssets, entity_tile_pos::EntityTilePos, world_gen::Blo
 
 pub const PLAYER_Z: f32 = 50.0;
 const PLAYER_TILE_SPEED: u32 = 1;
-// const PLAYER_HELD_SPEED: f32 = 0.8;
+const PLAYER_HELD_TIMER_MSEC: u64 = 100;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, setup_character)
-            .add_system(move_player.run_in_state(AppState::Running).run_if_not(dest_tile_is_blocked).label("logic"))
+        app.add_enter_system(AppState::GameLoading, setup_character.after("map"))
+            .add_system(
+                move_player
+                    .run_in_state(AppState::Running)
+                    .run_if_not(dest_tile_is_blocked)
+                    .label("logic"),
+            )
             .add_system(
                 player_sprite_update
                     .run_in_state(AppState::Running)
@@ -30,55 +37,86 @@ impl Plugin for PlayerPlugin {
 #[derive(Component)]
 pub struct Player;
 
-fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>) {
+/// Timer used as an sleeper for held actions
+#[derive(Component)]
+struct HeldTimer {
+    timer: Timer,
+}
+
+fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, blocking_q: Query<&TilePos, With<Blocking>>) {
+    // Find first nonblocking tilepos
+    let mut starting_pos = EntityTilePos {x: 64, y: 64};
+    // TODO test this out more and it doesn't work currently
+    // loop {
+    //     let blocked_tiles = blocking_q.iter_inner().filter(|elem| starting_pos.eq_tilepos(elem));
+    //     let amt_blocked_tiles = blocked_tiles.count();
+    //     println!("There were {} blocked tiles", amt_blocked_tiles);
+    //     if amt_blocked_tiles <= 0 {
+    //         break;
+    //     }
+    //
+    //     for _ in blocking_q.iter_inner().filter(|elem| starting_pos.eq_tilepos(elem)) {
+    //         println!("Moved player");
+    //         starting_pos.x += 1;
+    //         starting_pos.y += 1;
+    //         break;
+    //     }
+    //
+    // }
+
     commands.spawn((
         SpriteSheetBundle {
             texture_atlas: sprites.characters.clone(),
-            transform: Transform::from_xyz(64.0 * 8.0, 64.0 * 8.0, 50.0),
+            transform: Transform::from_xyz(starting_pos.x as f32 * 8.0, starting_pos.y as f32 * 8.0, 50.0),
             ..default()
         },
         Player,
-        EntityTilePos { x: 64, y: 64 },
+        starting_pos,
+        HeldTimer {
+            timer: Timer::new(Duration::from_millis(PLAYER_HELD_TIMER_MSEC), TimerMode::Repeating),
+        },
     ));
 
     println!("Created player succesfully");
 }
 
 /// Moves player entity from input
-fn move_player(mut player_q: Query<&mut EntityTilePos, With<Player>>, keeb: Res<Input<KeyCode>>) {
-    let mut player_tile_pos = player_q.single_mut();
+fn move_player(
+    mut player_q: Query<(&mut EntityTilePos, &mut HeldTimer), With<Player>>,
+    keeb: Res<Input<KeyCode>>,
+    time: Res<Time>,
+) {
+    let (mut player_tile_pos, mut held_timer) = player_q.single_mut();
+    held_timer.timer.tick(time.delta());
 
-    // for when the button is `tapped`
-    for pressed in keeb.get_just_pressed() {
-        match pressed {
-            KeyCode::W => player_tile_pos.y += PLAYER_TILE_SPEED,
-            KeyCode::A => player_tile_pos.x -= PLAYER_TILE_SPEED,
-            KeyCode::S => player_tile_pos.y -= PLAYER_TILE_SPEED,
-            KeyCode::D => player_tile_pos.x += PLAYER_TILE_SPEED,
-            _ => {}
-        }
+    // reset timer if tapping
+    if keeb.any_just_pressed([KeyCode::W, KeyCode::S, KeyCode::A, KeyCode::D]) {
+        held_timer
+            .timer
+            .set_duration(Duration::from_millis(PLAYER_HELD_TIMER_MSEC - 1));
     }
 
-    // // for when the button is `held`
-    // for held in keeb.get_pressed() {
-    //     match held {
-    //
-    //         KeyCode::W => { player_tile_pos.y += PLAYER_TILE_SPEED },
-    //         KeyCode::A => { player_tile_pos.x -= PLAYER_TILE_SPEED },
-    //         KeyCode::S => { player_tile_pos.y -= PLAYER_TILE_SPEED },
-    //         KeyCode::D => { player_tile_pos.x += PLAYER_TILE_SPEED },
-    //         _ => {}
-    //     }
-    // }
+    // for when the button is `held`
+    if !held_timer.timer.finished() {
+        return;
+    }
+
+    if keeb.pressed(KeyCode::W) {
+        player_tile_pos.y += PLAYER_TILE_SPEED
+    } else if keeb.pressed(KeyCode::S) {
+        player_tile_pos.y -= PLAYER_TILE_SPEED
+    } else if keeb.pressed(KeyCode::D) {
+        player_tile_pos.x += PLAYER_TILE_SPEED
+    } else if keeb.pressed(KeyCode::A) {
+        player_tile_pos.x -= PLAYER_TILE_SPEED
+    }
 }
 
 fn player_sprite_update(mut player_q: Query<(&mut Transform, &EntityTilePos), With<Player>>) {
     let (mut player_pos, player_tile_pos) = player_q.single_mut();
-
     let actual_pos = player_tile_pos.center_in_world();
 
     let lerped_pos = lerp(player_pos.translation.truncate(), actual_pos, 0.25);
-
     player_pos.translation = Vec3::new(lerped_pos.x, lerped_pos.y, PLAYER_Z);
 }
 
@@ -91,16 +129,22 @@ fn dest_tile_is_blocked(
     player_q: Query<&EntityTilePos, With<Player>>,
     blocking_q: Query<(&Blocking, &TilePos), Without<Player>>,
     tile_storage_q: Query<&TileStorage>,
-    keeb: Res<Input<KeyCode>>
+    keeb: Res<Input<KeyCode>>,
 ) -> bool {
     // find the dest_tile which is player_pos + direction pressed
     let player_tile_pos = player_q.single();
 
     let mut dest_tile = TilePos::new(player_tile_pos.x, player_tile_pos.y);
-    if keeb.pressed(KeyCode::W) { dest_tile.y += PLAYER_TILE_SPEED }
-    if keeb.pressed(KeyCode::A) { dest_tile.x -= PLAYER_TILE_SPEED }
-    if keeb.pressed(KeyCode::S) { dest_tile.y -= PLAYER_TILE_SPEED }
-    if keeb.pressed(KeyCode::D) { dest_tile.x += PLAYER_TILE_SPEED }
+    // else if here prevents dest_tile equalling zero delta and allowing a passthrough
+    if keeb.pressed(KeyCode::W) {
+        dest_tile.y += PLAYER_TILE_SPEED
+    } else if keeb.pressed(KeyCode::S) {
+        dest_tile.y -= PLAYER_TILE_SPEED
+    } else if keeb.pressed(KeyCode::D) {
+        dest_tile.x += PLAYER_TILE_SPEED
+    } else if keeb.pressed(KeyCode::A) {
+        dest_tile.x -= PLAYER_TILE_SPEED
+    }
 
     // println!("DestTile is {}, {}", dest_tile.x, dest_tile.y);
 
@@ -108,7 +152,10 @@ fn dest_tile_is_blocked(
     let tile_storage = tile_storage_q.single();
     let tile_entity = tile_storage.get(&dest_tile).unwrap();
     match blocking_q.get(tile_entity) {
-        Ok(_) => { println!("Blocking entity at {}, {}", dest_tile.x, dest_tile.y); true },
-        _ => { false }
+        Ok(_) => {
+            println!("Blocking entity at {}, {}", dest_tile.x, dest_tile.y);
+            true
+        }
+        _ => false,
     }
 }

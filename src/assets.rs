@@ -16,8 +16,8 @@ impl Plugin for AssetLoadPlugin {
 
 #[derive(AssetCollection, Resource)]
 pub struct SpriteAssets {
-    #[asset(path = "grasses.png")]
-    pub grass_tiles: Handle<Image>,
+    #[asset(path = "terrain.png")]
+    pub terrain: Handle<Image>,
 
     #[asset(texture_atlas(tile_size_x = 8., tile_size_y = 8., columns = 8, rows = 1))]
     #[asset(path = "characters.png")]
