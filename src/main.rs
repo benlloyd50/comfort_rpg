@@ -1,4 +1,5 @@
 mod entity_tile_pos;
+mod constants;
 
 mod assets;
 use assets::AssetLoadPlugin;

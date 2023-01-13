@@ -19,6 +19,9 @@ pub struct SpriteAssets {
     #[asset(path = "terrain.png")]
     pub terrain: Handle<Image>,
 
+    #[asset(path = "world_objs.png")]
+    pub world_objs: Handle<Image>,
+
     #[asset(texture_atlas(tile_size_x = 8., tile_size_y = 8., columns = 8, rows = 1))]
     #[asset(path = "characters.png")]
     pub characters: Handle<TextureAtlas>,

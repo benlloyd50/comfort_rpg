@@ -78,7 +78,7 @@ fn zoom_camera(
         return;
     }
 
-    let zoom_scroll_speed = 0.05;
+    let zoom_scroll_speed = 0.15;
     for direction in scroll_wheel.iter() {
         cam.scale =
             (cam.scale + zoom_scroll_speed * direction.y).clamp(Vec3::new(0.2, 0.2, 0.2), Vec3::new(6.0, 6.0, 6.0));
