@@ -10,5 +10,6 @@
 [Read me for plans and goals](docs/planning.md)
 
 # Screenshots
+![World Generation](screenshots/comfort_rpg_worldgen2.gif)
 ![In game forest](screenshots/forest1.png)
 ![In game forest with player](screenshots/player1.png)
