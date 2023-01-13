@@ -31,3 +31,4 @@
 
 ## Ideas
 - A flowing ocean with animated tiles?
+- Fishing
