@@ -1,9 +1,12 @@
-use crate::player::Player;
-use crate::AppState;
+use crate::{
+    effects::lerp,
+    player::{Player, SystemOrder},
+    AppState,
+};
 use bevy::{input::mouse::MouseWheel, prelude::*};
 use iyes_loopless::prelude::*;
 
-const Z_CAM: f32 = 100.; // Generally the highest depth and sprites past it will not be rendered
+const CAM_Z: f32 = 100.; // Generally the highest depth and sprites past it will not be rendered
 
 pub struct CameraPlugin;
 
@@ -13,7 +16,7 @@ impl Plugin for CameraPlugin {
             ConditionSet::new()
                 .run_in_state(AppState::Running)
                 .label("graphicDelay")
-                .after("graphic")
+                .after(SystemOrder::Graphic)
                 .with_system(zoom_camera)
                 .with_system(camera_follow_player)
                 .into(),
@@ -28,7 +31,7 @@ fn load_camera(mut commands: Commands) {
     let _camera_entity = commands
         .spawn((
             Camera2dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, Z_CAM),
+                transform: Transform::from_xyz(0.0, 0.0, CAM_Z),
                 projection: OrthographicProjection {
                     scale: 0.3,
                     ..default()
@@ -48,20 +51,9 @@ fn camera_follow_player(
     let mut cam_pos = camera.single_mut();
     let player_pos = player_q.single();
 
-    cam_pos.translation = player_pos.translation;
+    let lerped_pos = lerp(cam_pos.translation.truncate(), player_pos.translation.truncate(), 0.15);
+    cam_pos.translation = Vec3::new(lerped_pos.x, lerped_pos.y, CAM_Z);
 }
-
-// fn camera_follow_player(
-//     mut camera: Query<(&mut Transform, &Camera2d), Without<Player>>,
-//     players: Query<(&Transform, &Player), Without<Camera2d>>,
-// ) {
-//     for (player, _) in players.iter() {
-//         for (mut cam, _) in camera.iter_mut() {
-//             cam.translation.x = player.translation.x;
-//             cam.translation.y = player.translation.y;
-//         }
-//     }
-// }
 
 fn zoom_camera(
     mut camera_query: Query<(&mut Transform, &Camera2d, &mut CamScrollLock)>,

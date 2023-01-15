@@ -17,7 +17,7 @@ use crate::world_gen::{TILE_PIXELS_X, TILE_PIXELS_Y};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
-#[derive(Component)]
+#[derive(Clone, Copy, Component)]
 pub struct EntityTilePos {
     pub x: u32,
     pub y: u32,

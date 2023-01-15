@@ -1,9 +1,12 @@
-mod entity_tile_pos;
 mod constants;
+mod effects;
+mod entity_tile_pos;
 
 mod assets;
 use assets::AssetLoadPlugin;
+mod interact;
 mod world_gen;
+use interact::InteractPlugin;
 use world_gen::WorldGenerationPlugin;
 mod camera;
 use camera::CameraPlugin;
@@ -31,6 +34,7 @@ fn main() {
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(CameraPlugin)
         .add_plugin(PlayerPlugin)
+        .add_plugin(InteractPlugin)
         .add_system(run_game.run_in_state(AppState::GameLoading))
         .run();
 }

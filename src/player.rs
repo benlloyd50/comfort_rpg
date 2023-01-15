@@ -4,65 +4,92 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
-use crate::{assets::SpriteAssets, entity_tile_pos::EntityTilePos, world_gen::{Blocking, MAP_SIZE_X, MAP_SIZE_Y, world_size, within_bounds}, AppState};
+use crate::{
+    assets::SpriteAssets,
+    effects::lerp,
+    entity_tile_pos::EntityTilePos,
+    interact::{Interact, HealthBelowZeroEvent},
+    world_gen::{within_bounds, Blocking},
+    AppState,
+};
 
 pub const PLAYER_Z: f32 = 50.0;
 const PLAYER_TILE_SPEED: u32 = 1;
-const PLAYER_HELD_TIMER_MSEC: u64 = 100;
+const PLAYER_INTERACT_TIMER_MS: u64 = 600;
+const PLAYER_MOVE_TIMER_MS: u64 = 100;
 
 pub struct PlayerPlugin;
 
+#[derive(Eq, PartialEq, SystemLabel)]
+pub enum SystemOrder {
+    Input,
+    Logic,
+    Graphic,
+}
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
+        // Input => Logic => Graphic => cleanup
         app.add_enter_system(AppState::GameLoading, setup_character.after("map"))
+            .add_event::<MoveEvent>()
+            .add_event::<Interaction>()
             .add_system(
                 move_player
                     .run_in_state(AppState::Running)
-                    .run_if_not(dest_tile_is_blocked)
-                    .label("logic"),
+                    .run_if(movement_cooldown)
+                    .label(SystemOrder::Logic)
+                    .after(SystemOrder::Input),
             )
+            .add_system(
+                directional_input_handle
+                    .run_in_state(AppState::Running)
+                    .label(SystemOrder::Input)
+                    .before(SystemOrder::Logic),
+            )
+            .add_system(
+                player_interact_handler
+                    .run_in_state(AppState::Running)
+                    .run_if(interact_cooldown)
+                    .label(SystemOrder::Logic)
+                    .after(SystemOrder::Input),
+                )
             .add_system(
                 update_sprite_position::<Player>
                     .run_in_state(AppState::Running)
-                    .label("graphic")
-                    .after("logic"),
+                    .label(SystemOrder::Graphic)
+                    .after(SystemOrder::Logic),
             );
     }
-    //System Order Idea
-    // player_input.label(Input::Listen).run_in_state(AppState::Running)
-    // move_player.run_in_state(AppState::Running)
-    //          .run_if(tile_is_unblocked).label(Input::Process).after(Input::Listen)
 }
 
 #[derive(Component)]
 pub struct Player;
 
-/// Timer used as an sleeper for held actions
 #[derive(Component)]
-struct HeldTimer {
-    timer: Timer,
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
+struct MoveEvent(Entity, TilePos);
+
+struct Interaction {
+    sender: Entity,
+    reciever: Entity,
+}
+
+/// Timer used as an sleeper for held actions
+#[derive(Component)]
+struct InteractTimer(Timer);
+
+#[derive(Component)]
+struct HeldTimer(Timer);
+
 fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking_q: Query<&TilePos, With<Blocking>>) {
-    // Find first nonblocking tilepos
+    // TODO Find first nonblocking tilepos
     let starting_pos = EntityTilePos { x: 64, y: 64 };
-    // TODO test this out more and it doesn't work currently
-    // loop {
-    //     let blocked_tiles = blocking_q.iter_inner().filter(|elem| starting_pos.eq_tilepos(elem));
-    //     let amt_blocked_tiles = blocked_tiles.count();
-    //     println!("There were {} blocked tiles", amt_blocked_tiles);
-    //     if amt_blocked_tiles <= 0 {
-    //         break;
-    //     }
-    //
-    //     for _ in blocking_q.iter_inner().filter(|elem| starting_pos.eq_tilepos(elem)) {
-    //         println!("Moved player");
-    //         starting_pos.x += 1;
-    //         starting_pos.y += 1;
-    //         break;
-    //     }
-    //
-    // }
 
     commands.spawn((
         SpriteSheetBundle {
@@ -71,45 +98,43 @@ fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking
             ..default()
         },
         Player,
+        Direction::Down,
         starting_pos,
-        HeldTimer {
-            timer: Timer::new(Duration::from_millis(PLAYER_HELD_TIMER_MSEC), TimerMode::Repeating),
-        },
+        InteractTimer(Timer::new(Duration::from_millis(PLAYER_INTERACT_TIMER_MS), TimerMode::Repeating)),
+        HeldTimer(Timer::new(Duration::from_millis(PLAYER_MOVE_TIMER_MS), TimerMode::Repeating)),
     ));
 
     println!("Created player succesfully");
 }
 
 /// Moves player entity from input
-fn move_player(
-    mut player_q: Query<(&mut EntityTilePos, &mut HeldTimer), With<Player>>,
-    keeb: Res<Input<KeyCode>>,
-    time: Res<Time>,
-) {
-    let (mut player_tile_pos, mut held_timer) = player_q.single_mut();
-    held_timer.timer.tick(time.delta());
-
-    // reset timer if tapping movement keys
-    if keeb.any_just_pressed([KeyCode::W, KeyCode::S, KeyCode::A, KeyCode::D]) {
-        held_timer
-            .timer
-            .set_duration(Duration::from_millis(PLAYER_HELD_TIMER_MSEC - 1));
+fn move_player(mut player_q: Query<&mut EntityTilePos>, mut ev_move: EventReader<MoveEvent>) {
+    for ev in ev_move.iter() {
+        match player_q.get_mut(ev.0) {
+            Ok(mut player_tile_pos) => {
+                player_tile_pos.x = ev.1.x;
+                player_tile_pos.y = ev.1.y;
+            }
+            Err(_) => {}
+        };
     }
+}
 
-    // for when the button is `held`
-    if !held_timer.timer.finished() {
-        return;
-    }
+// Returns true if the timer has finished in the frame
+fn movement_cooldown(mut timer_q: Query<&mut HeldTimer, With<Player>>, time: Res<Time>) -> bool {
+    let mut move_time = timer_q.single_mut();
+    move_time.0.tick(time.delta());
+    move_time.0.finished()
+    // if keeb.any_just_pressed([KeyCode::D, KeyCode::A, KeyCode::S, KeyCode::W]) {
+    //     move_time.0.tick(Duration::from_millis(PLAYER_MOVE_TIMER_MS));
+    // }   // Too much power cannot slow down
 
-    if keeb.pressed(KeyCode::W) {
-        player_tile_pos.y += PLAYER_TILE_SPEED
-    } else if keeb.pressed(KeyCode::S) {
-        player_tile_pos.y -= PLAYER_TILE_SPEED
-    } else if keeb.pressed(KeyCode::D) {
-        player_tile_pos.x += PLAYER_TILE_SPEED
-    } else if keeb.pressed(KeyCode::A) {
-        player_tile_pos.x -= PLAYER_TILE_SPEED
-    }
+}
+
+fn interact_cooldown(mut timer_q: Query<&mut InteractTimer, With<Player>>, time: Res<Time>) -> bool {
+    let mut interact_time = timer_q.single_mut();
+    interact_time.0.tick(time.delta());
+    interact_time.0.finished()
 }
 
 /// Updates the sprite position based on a discrete position in the entity
@@ -121,55 +146,120 @@ fn update_sprite_position<Type: Component>(mut entity_q: Query<(&mut Transform, 
     sprite_pos.translation = Vec3::new(lerped_pos.x, lerped_pos.y, PLAYER_Z);
 }
 
-/// Moves start vec towards finish vec by the scalar value (same in both directions)
-fn lerp(start: Vec2, finish: Vec2, scalar: f32) -> Vec2 {
-    start + (finish - start) * scalar
-}
-
-fn dest_tile_is_blocked(
-    player_q: Query<&EntityTilePos, With<Player>>,
+/// Checks to ensure dest tile is inbounds of the map
+fn directional_input_handle(
+    mut player_q: Query<(Entity, &EntityTilePos, &mut Direction), With<Player>>,
+    mut interactables_q: Query<(Entity, &TilePos), With<Interact>>,
     blocking_q: Query<&TileStorage, With<Blocking>>,
     keeb: Res<Input<KeyCode>>,
-) -> bool {
+    mut ev_moveplayer: EventWriter<MoveEvent>,
+    mut ev_interact: EventWriter<Interaction>,
+) {
     // find the dest_tile which is player_pos + direction pressed
-    let player_tile_pos = player_q.single();
+    let (player_entity, player_tile_pos, mut direction) = player_q.single_mut();
 
     let mut dest_tile = Vec2::new(player_tile_pos.x as f32, player_tile_pos.y as f32);
-    // else if here prevents dest_tile equalling zero delta and allowing a passthrough
+    // else if here prevents dest_tile equalling zero delta
     if keeb.pressed(KeyCode::W) {
-        dest_tile.y += PLAYER_TILE_SPEED as f32
+        dest_tile.y += PLAYER_TILE_SPEED as f32;
+        *direction = Direction::Up;
     } else if keeb.pressed(KeyCode::S) {
-        dest_tile.y -= PLAYER_TILE_SPEED as f32
-    } else if keeb.pressed(KeyCode::D) {
-        dest_tile.x += PLAYER_TILE_SPEED as f32
+        dest_tile.y -= PLAYER_TILE_SPEED as f32;
+        *direction = Direction::Down;
+    }
+    if keeb.pressed(KeyCode::D) {
+        dest_tile.x += PLAYER_TILE_SPEED as f32;
+        *direction = Direction::Right;
     } else if keeb.pressed(KeyCode::A) {
-        dest_tile.x -= PLAYER_TILE_SPEED as f32
+        dest_tile.x -= PLAYER_TILE_SPEED as f32;
+        *direction = Direction::Left;
     }
 
-    if !within_bounds(dest_tile) {
-        println!("Out of bounds check at {},{}", dest_tile.x, dest_tile.y);
-        return true;
+    // if the dest_tile or input was 0 then we don't do anything else
+    // make sure the position is not out of bounds of the map
+    if dest_tile == Vec2::new(player_tile_pos.x as f32, player_tile_pos.y as f32)
+        || !within_bounds(Vec2::new(dest_tile.x as f32, dest_tile.y as f32))
+    {
+        return;
     }
 
-    let dest_tile = TilePos{x: dest_tile.x as u32, y: dest_tile.y as u32};
-
-    // compare the dest_tile to the blocker if there is one at that tile
-    let blocking_tiles = match blocking_q.get_single() {
-        Ok(e) => e,
-        Err(_) => {
-            println!("multiple storages :P");
-            return true;
-        } // if there are two tile storages we assume something is wrong and dont let the player move
+    let dest_tile = TilePos {
+        x: dest_tile.x as u32,
+        y: dest_tile.y as u32,
     };
 
-    match blocking_tiles.get(&dest_tile) {
-        Some(_) => {
-            println!("Blocking entity at {}, {}", dest_tile.x, dest_tile.y);
-            true
-        }
-        None => {
-            false 
+    match blocking_q.get_single() {
+        Ok(block_tilestorage) => match block_tilestorage.get(&dest_tile) {
+            Some(tile_entity) => {
+                match interactables_q.get_mut(tile_entity) {
+                    Ok((entity, _)) => {
+                        ev_interact.send(Interaction{ sender: player_entity, reciever: entity});
+                        return;
+                    }
+                    Err(_) => {
+                        return;
+                    }
+                };
+            }
+            None => {
+                ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
+                return;
+            }
         },
+        Err(_) => {
+            println!("two blocking tile_storages");
+            return;
+        } // if there are two tile storages we assume something is wrong and dont let the player move
     }
+}
+
+// Attempts to bump into the destination tile triggering the bump action
+// fn bump_dest_tile(
+//     player_q: Query<&DestTile, With<Player>>,
+//     mut ev_killed: EventWriter<HealthBelowZeroEvent>,
+// ) {
+//     let dest_tile = match player_q.get_single() {
+//         Ok(tile) => tile,
+//         Err(_) => {
+//             return;
+//         }
+//     };
+//
+//     let dest_tile = dest_tile.0;
+// }
+
+fn player_interact_handler(
+    mut player_q: Query<Entity, (With<EntityTilePos>, With<Player>)>,
+    mut interactables_q: Query<(&mut Interact, Entity, &TilePos)>,
+    mut ev_interact: EventReader<Interaction>,
+    mut ev_killed: EventWriter<HealthBelowZeroEvent>,
+) {
+    for ev in ev_interact.iter() {
+        let _ = match player_q.get_mut(ev.sender) {
+            Ok(player_entity) => player_entity, 
+            Err(_) => {return},
+        };
+        let mut interact = match interactables_q.get_mut(ev.reciever) {
+            Ok(interact) => interact,
+            Err(_) => {return},
+        };
+        match &mut *interact.0 {
+            Interact::Harvest(health) => {
+                if health.hp <= 0 {
+                    return;
+                }
+                health.hp -= 2;
+                println!("struck tree with fist hp: {}", health.hp);
+                if health.hp <= 0 {
+                    ev_killed.send(HealthBelowZeroEvent(interact.1, *interact.2));
+                    println!("tree is dead");
+                }
+            }
+            Interact::Pickup() => {}
+            Interact::Consume() => {}
+        }
+    }
+
+
 }
 

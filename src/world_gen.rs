@@ -1,5 +1,10 @@
-use crate::constants::world_obj_sprites::*;
-
+/* World Generation
+ *
+ * Goals of this file:
+ *    To create unique fun interesting worlds that the player will want to explore and enjoy
+ *    To keep functions clean and reusable if necessary under 30 locs per function if possible
+ *
+ */
 use bracket_noise::prelude::*;
 use rand::Rng;
 
@@ -7,7 +12,7 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
-use crate::{assets::SpriteAssets, AppState};
+use crate::{assets::SpriteAssets, constants::world_obj_sprites::*, interact::*, AppState};
 
 pub const MAP_SIZE_X: u32 = 128; // Size of map currently only supports square maps
 pub const MAP_SIZE_Y: u32 = 128; // Size of map currently only supports square maps
@@ -39,11 +44,11 @@ impl Plugin for WorldGenerationPlugin {
 
 fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
     let tilemap_size = world_size();
+    let mut walkable_tiles = TileStorage::empty(tilemap_size);
+    let mut blocked_tiles = TileStorage::empty(tilemap_size);
 
     let walkable_tilemap = commands.spawn_empty().id();
     let blocked_tilemap = commands.spawn_empty().id();
-    let mut walkable_tiles = TileStorage::empty(tilemap_size);
-    let mut blocked_tiles = TileStorage::empty(tilemap_size);
 
     let seed = rand::random::<u64>();
 
@@ -61,17 +66,19 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
         transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
         ..Default::default()
     });
-    commands.entity(blocked_tilemap).insert((TilemapBundle {
-        grid_size: tilegridsize_pixels(),
-        map_type: TilemapType::default(),
-        size: tilemap_size,
-        storage: blocked_tiles,
-        texture: TilemapTexture::Single(tiles.world_objs.clone()),
-        tile_size: tilemaptilesize_pixels(),
-        transform: Transform::from_translation(Vec3::new(0f32, 0f32, OBJECT_Z)),
-        ..Default::default()
-    },
-    Blocking));
+    commands.entity(blocked_tilemap).insert((
+        TilemapBundle {
+            grid_size: tilegridsize_pixels(),
+            map_type: TilemapType::default(),
+            size: tilemap_size,
+            storage: blocked_tiles,
+            texture: TilemapTexture::Single(tiles.world_objs.clone()),
+            tile_size: tilemaptilesize_pixels(),
+            transform: Transform::from_translation(Vec3::new(0f32, 0f32, OBJECT_Z)),
+            ..Default::default()
+        },
+        Blocking,
+    ));
     println!("World Created succesfully");
 }
 
@@ -97,7 +104,7 @@ fn regenerate_world(
             }
         }
         commands.entity(tilemap_entity).despawn_recursive();
-    };
+    }
 
     // Create world
     create_world(commands, sprites);
@@ -122,36 +129,34 @@ fn spawn_terrain(
 
             if perlin_value > 0.05f32 && perlin_value < 0.2f32 {
                 // Water
-                let tile_entity = commands.spawn(TileBundle {
-                    position: tile_pos,
-                    tilemap_id: TilemapId(map_entity),
-                    texture_index: TileTextureIndex(13),
-                    ..Default::default()
-                }).id();
+                let tile_entity = commands
+                    .spawn(TileBundle {
+                        position: tile_pos,
+                        tilemap_id: TilemapId(map_entity),
+                        texture_index: TileTextureIndex(13),
+                        ..Default::default()
+                    })
+                    .id();
                 blocked_tiles.set(&tile_pos, tile_entity);
             } else {
                 let foilage_percent = rng.gen::<u32>() % 100;
                 let foilage_type = rng.gen_range(1..5);
                 let tile_index = if foilage_percent >= 20 { 0 } else { foilage_type };
-                let tile_entity = commands.spawn(TileBundle {
-                    position: tile_pos,
-                    tilemap_id: TilemapId(map_entity),
-                    texture_index: TileTextureIndex(tile_index),
-                    ..Default::default()
-                }).id();
+                let tile_entity = commands
+                    .spawn(TileBundle {
+                        position: tile_pos,
+                        tilemap_id: TilemapId(map_entity),
+                        texture_index: TileTextureIndex(tile_index),
+                        ..Default::default()
+                    })
+                    .id();
                 walkable_tiles.set(&tile_pos, tile_entity);
             }
-
         }
     }
 }
 
-fn spawn_trees(
-    commands: &mut Commands,
-    blocked_tiles: &mut TileStorage,
-    blocked_tilemap: Entity,
-    seed: u64,
-) {
+fn spawn_trees(commands: &mut Commands, blocked_tiles: &mut TileStorage, blocked_tilemap: Entity, seed: u64) {
     let noise = tree_perlin(seed);
 
     for x in 0..MAP_SIZE_X {
@@ -161,11 +166,11 @@ fn spawn_trees(
 
             match blocked_tiles.checked_get(&tree_top_pos) {
                 Some(_) => continue,
-                None => {},
+                None => {}
             };
             match blocked_tiles.checked_get(&tree_base_pos) {
                 Some(_) => continue,
-                None => {},
+                None => {}
             };
 
             let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
@@ -173,28 +178,43 @@ fn spawn_trees(
 
             if perlin_value < 0.2f32 || perlin_value > 0.6f32 {
                 //spawn object
-                let base_entity = commands.spawn((TileBundle {
-                        position: tree_base_pos,
-                        tilemap_id: TilemapId(blocked_tilemap),
-                        texture_index: TileTextureIndex(TREE_BASE),
-                        ..default()
-                    },
-                    Tree,
-                )).id();
-                let top_entity = commands.spawn((TileBundle {
-                        position: tree_top_pos,
-                        tilemap_id: TilemapId(blocked_tilemap),
-                        texture_index: TileTextureIndex(TREE_TOP),
-                        ..default()
-                    },
-                    Tree,
-                )).id();
-
+                let (base_entity, top_entity) = place_medium_tree(commands, &blocked_tilemap, &tree_base_pos);
                 blocked_tiles.set(&tree_base_pos, base_entity);
                 blocked_tiles.set(&tree_top_pos, top_entity);
             }
         }
     }
+}
+
+fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_base_pos: &TilePos) -> (Entity, Entity) {
+    let base_entity = commands
+        .spawn((
+            TileBundle {
+                position: *tree_base_pos,
+                tilemap_id: TilemapId(*blocked_tilemap),
+                texture_index: TileTextureIndex(TREE_BASE),
+                ..default()
+            },
+            Tree,
+            Interact::Harvest(Health::new(5)),
+        ))
+        .id();
+    let top_entity = commands
+        .spawn((
+            TileBundle {
+                position: TilePos {
+                    x: tree_base_pos.x,
+                    y: tree_base_pos.y + 1,
+                },
+                tilemap_id: TilemapId(*blocked_tilemap),
+                texture_index: TileTextureIndex(TREE_TOP),
+                ..default()
+            },
+            Tree,
+        ))
+        .id();
+
+    (base_entity, top_entity)
 }
 
 fn stretch_tree(mut tree_q: Query<(&mut Transform, &TilePos), With<Tree>>, keeb: Res<Input<KeyCode>>) {
