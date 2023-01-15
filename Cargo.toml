@@ -8,9 +8,7 @@ edition = "2021"
 [dependencies]
 bevy = "0.9"
 bevy_asset_loader = { version = "0.14", features = ["2d", "stageless"]}
-# TODO: add atlas feature to below
-# bevy_ecs_tilemap = { version = "0.9" features = ["atlas"] }
-bevy_ecs_tilemap = "0.9"
+bevy_ecs_tilemap = { version = "0.9", features = ["atlas"] }
 iyes_loopless = "0.9.1"
 rand = "0.8.5"
 bracket-noise = "0.8"
