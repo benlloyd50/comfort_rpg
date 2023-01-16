@@ -3,3 +3,5 @@
 *.aseprite
 
 assets/sound/
+
+.rustfmt.toml

@@ -8,7 +8,7 @@ use crate::{
     assets::SpriteAssets,
     effects::lerp,
     entity_tile_pos::EntityTilePos,
-    interact::{Interact, HealthBelowZeroEvent},
+    interact::{HealthBelowZeroEvent, Interact},
     world_gen::{within_bounds, Blocking},
     AppState,
 };
@@ -52,7 +52,7 @@ impl Plugin for PlayerPlugin {
                     .run_if(interact_cooldown)
                     .label(SystemOrder::Logic)
                     .after(SystemOrder::Input),
-                )
+            )
             .add_system(
                 update_sprite_position::<Player>
                     .run_in_state(AppState::Running)
@@ -88,7 +88,7 @@ struct InteractTimer(Timer);
 struct HeldTimer(Timer);
 
 fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking_q: Query<&TilePos, With<Blocking>>) {
-    // TODO Find first nonblocking tilepos
+    // TODO: Find first nonblocking tilepos
     let starting_pos = EntityTilePos { x: 64, y: 64 };
 
     commands.spawn((
@@ -128,7 +128,6 @@ fn movement_cooldown(mut timer_q: Query<&mut HeldTimer, With<Player>>, time: Res
     // if keeb.any_just_pressed([KeyCode::D, KeyCode::A, KeyCode::S, KeyCode::W]) {
     //     move_time.0.tick(Duration::from_millis(PLAYER_MOVE_TIMER_MS));
     // }   // Too much power cannot slow down
-
 }
 
 fn interact_cooldown(mut timer_q: Query<&mut InteractTimer, With<Player>>, time: Res<Time>) -> bool {
@@ -149,8 +148,8 @@ fn update_sprite_position<Type: Component>(mut entity_q: Query<(&mut Transform, 
 /// Checks to ensure dest tile is inbounds of the map
 fn directional_input_handle(
     mut player_q: Query<(Entity, &EntityTilePos, &mut Direction), With<Player>>,
-    mut interactables_q: Query<(Entity, &TilePos), With<Interact>>,
-    blocking_q: Query<&TileStorage, With<Blocking>>,
+    interactables_q: Query<(Entity, &TilePos), With<Interact>>,
+    blocking_q: Query<&TilePos, With<Blocking>>,
     keeb: Res<Input<KeyCode>>,
     mut ev_moveplayer: EventWriter<MoveEvent>,
     mut ev_interact: EventWriter<Interaction>,
@@ -188,45 +187,17 @@ fn directional_input_handle(
         y: dest_tile.y as u32,
     };
 
-    match blocking_q.get_single() {
-        Ok(block_tilestorage) => match block_tilestorage.get(&dest_tile) {
-            Some(tile_entity) => {
-                match interactables_q.get_mut(tile_entity) {
-                    Ok((entity, _)) => {
-                        ev_interact.send(Interaction{ sender: player_entity, reciever: entity});
-                        return;
-                    }
-                    Err(_) => {
-                        return;
-                    }
-                };
-            }
-            None => {
-                ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
-                return;
-            }
-        },
-        Err(_) => {
-            println!("two blocking tile_storages");
-            return;
-        } // if there are two tile storages we assume something is wrong and dont let the player move
+    // if there are any in here then we cant move
+    if let Some((interactable_entity, _)) = interactables_q.iter().find(|(_, elem)| dest_tile.eq(elem)) {
+        ev_interact.send(Interaction { sender: player_entity, reciever: interactable_entity });
+    }
+    else if let Some(_) = blocking_q.iter().find(|elem| dest_tile.eq(elem)) {
+        return;
+    }
+    else {
+        ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
     }
 }
-
-// Attempts to bump into the destination tile triggering the bump action
-// fn bump_dest_tile(
-//     player_q: Query<&DestTile, With<Player>>,
-//     mut ev_killed: EventWriter<HealthBelowZeroEvent>,
-// ) {
-//     let dest_tile = match player_q.get_single() {
-//         Ok(tile) => tile,
-//         Err(_) => {
-//             return;
-//         }
-//     };
-//
-//     let dest_tile = dest_tile.0;
-// }
 
 fn player_interact_handler(
     mut player_q: Query<Entity, (With<EntityTilePos>, With<Player>)>,
@@ -236,12 +207,12 @@ fn player_interact_handler(
 ) {
     for ev in ev_interact.iter() {
         let _ = match player_q.get_mut(ev.sender) {
-            Ok(player_entity) => player_entity, 
-            Err(_) => {return},
+            Ok(player_entity) => player_entity,
+            Err(_) => return,
         };
         let mut interact = match interactables_q.get_mut(ev.reciever) {
             Ok(interact) => interact,
-            Err(_) => {return},
+            Err(_) => return,
         };
         match &mut *interact.0 {
             Interact::Harvest(health) => {
@@ -259,7 +230,4 @@ fn player_interact_handler(
             Interact::Consume() => {}
         }
     }
-
-
 }
-

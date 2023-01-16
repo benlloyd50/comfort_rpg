@@ -7,7 +7,7 @@
 // and the Transform component on the player, atleast, will be purely graphical
 //
 // This should ultimately end up in its own class as some point
-// 1/11/23 TODO I also currently have concerns that this is justified over TilePos for no good reason currently
+// 1/11/23 TODO: I also currently have concerns that this is justified over TilePos for no good reason currently
 // This should be addressed by the end of the prototype
 
 /// EntityTilePos

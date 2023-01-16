@@ -36,42 +36,49 @@ impl Plugin for WorldGenerationPlugin {
     }
 }
 
-// #[derive(Component)]
-// struct BlockingPositions {
-//     positions: Vec<>
+// pub struct OverWorld {
+//     floor_tiles: TileStorage,
+//     floor_tilemap: Entity,
+//     objs_tiles: TileStorage,
+//     objes_tilemap: Entity
 // }
-// let (tile_storage, blocked_tiles) = query.get()
 
 fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
     let tilemap_size = world_size();
-    let mut walkable_tiles = TileStorage::empty(tilemap_size);
-    let mut blocked_tiles = TileStorage::empty(tilemap_size);
 
-    let walkable_tilemap = commands.spawn_empty().id();
-    let blocked_tilemap = commands.spawn_empty().id();
+    // Floor tiles are the underlying tiles to everything in the overworld, should NEVER be empty,
+    // limited to the terrain atlas
+    let mut floor_tiles = TileStorage::empty(tilemap_size);
+    let floor_tilemap = commands.spawn_empty().id();
 
+    // Objs tiles are the items, world objects, special terrain features that appear on top of the floor
+    // limited to the world_objs atlas
+    let mut objs_tiles = TileStorage::empty(tilemap_size);
+    let objs_tilemap = commands.spawn_empty().id();
+
+    // TODO: allow user to input a seed, maybe using a config file?
     let seed = rand::random::<u64>();
 
     // Spawn the elements of the tilemaps.
-    spawn_terrain(&mut commands, &mut walkable_tiles, &mut blocked_tiles, walkable_tilemap, seed);
-    spawn_trees(&mut commands, &mut blocked_tiles, blocked_tilemap, seed);
+    spawn_terrain(&mut commands, &mut floor_tiles, floor_tilemap, seed);
+    spawn_trees(&mut commands, &mut objs_tiles, objs_tilemap, seed);
 
-    commands.entity(walkable_tilemap).insert(TilemapBundle {
+    commands.entity(floor_tilemap).insert(TilemapBundle {
         grid_size: tilegridsize_pixels(),
         map_type: TilemapType::default(),
         size: tilemap_size,
-        storage: walkable_tiles,
+        storage: floor_tiles,
         texture: TilemapTexture::Single(tiles.terrain.clone()),
         tile_size: tilemaptilesize_pixels(),
         transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
         ..Default::default()
     });
-    commands.entity(blocked_tilemap).insert((
+    commands.entity(objs_tilemap).insert((
         TilemapBundle {
             grid_size: tilegridsize_pixels(),
             map_type: TilemapType::default(),
             size: tilemap_size,
-            storage: blocked_tiles,
+            storage: objs_tiles,
             texture: TilemapTexture::Single(tiles.world_objs.clone()),
             tile_size: tilemaptilesize_pixels(),
             transform: Transform::from_translation(Vec3::new(0f32, 0f32, OBJECT_Z)),
@@ -113,8 +120,7 @@ fn regenerate_world(
 /// Fills walkable_tiles with terrain and fills blocked_tiles with water
 fn spawn_terrain(
     commands: &mut Commands,
-    walkable_tiles: &mut TileStorage,
-    blocked_tiles: &mut TileStorage,
+    floor_tiles: &mut TileStorage,
     map_entity: Entity,
     seed: u64,
 ) {
@@ -127,36 +133,33 @@ fn spawn_terrain(
             let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
             perlin_value = (perlin_value + 1.0) * 0.5;
 
-            if perlin_value > 0.05f32 && perlin_value < 0.2f32 {
+            let tile_entity = commands.spawn_empty().id();
+            let texture_index = if perlin_value > 0.05f32 && perlin_value < 0.2f32 {
                 // Water
-                let tile_entity = commands
-                    .spawn(TileBundle {
-                        position: tile_pos,
-                        tilemap_id: TilemapId(map_entity),
-                        texture_index: TileTextureIndex(13),
-                        ..Default::default()
-                    })
-                    .id();
-                blocked_tiles.set(&tile_pos, tile_entity);
+                commands.entity(tile_entity).insert(Blocking);
+                TileTextureIndex(13)
             } else {
                 let foilage_percent = rng.gen::<u32>() % 100;
                 let foilage_type = rng.gen_range(1..5);
-                let tile_index = if foilage_percent >= 20 { 0 } else { foilage_type };
-                let tile_entity = commands
-                    .spawn(TileBundle {
-                        position: tile_pos,
-                        tilemap_id: TilemapId(map_entity),
-                        texture_index: TileTextureIndex(tile_index),
-                        ..Default::default()
-                    })
-                    .id();
-                walkable_tiles.set(&tile_pos, tile_entity);
-            }
+                if foilage_percent >= 20 {
+                    TileTextureIndex(0)
+                } else {
+                    TileTextureIndex(foilage_type)
+                }
+            };
+            commands.entity(tile_entity).insert( TileBundle {
+                    position: tile_pos,
+                    tilemap_id: TilemapId(map_entity),
+                    texture_index,
+                    ..Default::default()
+                });
+
+            floor_tiles.set(&tile_pos, tile_entity);
         }
     }
 }
 
-fn spawn_trees(commands: &mut Commands, blocked_tiles: &mut TileStorage, blocked_tilemap: Entity, seed: u64) {
+fn spawn_trees(commands: &mut Commands, objs_tiles: &mut TileStorage, objs_tilemap: Entity, seed: u64) {
     let noise = tree_perlin(seed);
 
     for x in 0..MAP_SIZE_X {
@@ -164,23 +167,21 @@ fn spawn_trees(commands: &mut Commands, blocked_tiles: &mut TileStorage, blocked
             let tree_base_pos = TilePos { x, y };
             let tree_top_pos = TilePos { x, y: y + 1 };
 
-            match blocked_tiles.checked_get(&tree_top_pos) {
-                Some(_) => continue,
-                None => {}
-            };
-            match blocked_tiles.checked_get(&tree_base_pos) {
-                Some(_) => continue,
-                None => {}
-            };
+            if let Some(_) = objs_tiles.checked_get(&tree_top_pos) {
+                continue;
+            }
+            if let Some(_) = objs_tiles.checked_get(&tree_base_pos) {
+                continue;
+            }
 
             let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
             perlin_value = (perlin_value + 1.0) * 0.5;
 
             if perlin_value < 0.2f32 || perlin_value > 0.6f32 {
                 //spawn object
-                let (base_entity, top_entity) = place_medium_tree(commands, &blocked_tilemap, &tree_base_pos);
-                blocked_tiles.set(&tree_base_pos, base_entity);
-                blocked_tiles.set(&tree_top_pos, top_entity);
+                let (base_entity, top_entity) = place_medium_tree(commands, &objs_tilemap, &tree_base_pos);
+                objs_tiles.set(&tree_base_pos, base_entity);
+                objs_tiles.set(&tree_top_pos, top_entity);
             }
         }
     }
@@ -197,6 +198,7 @@ fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_bas
             },
             Tree,
             Interact::Harvest(Health::new(5)),
+            Blocking
         ))
         .id();
     let top_entity = commands
@@ -211,6 +213,7 @@ fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_bas
                 ..default()
             },
             Tree,
+            Blocking
         ))
         .id();
 
@@ -274,8 +277,7 @@ fn tilemaptilesize_pixels() -> TilemapTileSize {
     }
 }
 
-// Marks a tile as blocking
-// Also used to mark the tilestorage as the one representing blocked tiles
+// Marks the tile_entity to denote it is unpassable
 #[derive(Component)]
 pub struct Blocking;
 
