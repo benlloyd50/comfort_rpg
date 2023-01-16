@@ -91,7 +91,7 @@ fn zoom_camera(
 
     let zoom_scroll_speed = 0.1;
     for direction in scroll_wheel.iter() {
-        ortho.scale = (ortho.scale + zoom_scroll_speed * direction.y).clamp(0.1, 1.0);
+        ortho.scale = ((ortho.scale + zoom_scroll_speed * direction.y).clamp(0.1, 1.0) * 10.0).round() / 10.0;
         println!("{}", ortho.scale);
     }
 }
