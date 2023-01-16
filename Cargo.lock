@@ -1093,6 +1093,8 @@ dependencies = [
  "bracket-noise",
  "iyes_loopless",
  "rand",
+ "serde",
+ "toml",
 ]
 
 [[package]]

@@ -12,6 +12,8 @@ bevy_ecs_tilemap = { version = "0.9", features = ["atlas"] }
 iyes_loopless = "0.9.1"
 rand = "0.8.5"
 bracket-noise = "0.8"
+toml = "0.5.10"
+serde = { version = "1.0", features = ["derive"] }
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

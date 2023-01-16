@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
-use crate::{assets::SpriteAssets, constants::world_obj_sprites::*, interact::*, AppState};
+use crate::{assets::SpriteAssets, comfort_config::load_settings, constants::world_obj_sprites::*, interact::*, AppState};
 
 pub const MAP_SIZE_X: u32 = 128; // Size of map currently only supports square maps
 pub const MAP_SIZE_Y: u32 = 128; // Size of map currently only supports square maps
@@ -321,23 +321,33 @@ struct Tree;
 //=====> Perlin generators and settings
 
 fn terrain_perlin(seed: u64) -> FastNoise {
+    
+    let config = match load_settings("terrainperlin") {
+        Ok(config) => config,
+        Err(_) => panic!("Could not load terrainperlin settings"),
+    };
     let mut noise = FastNoise::seeded(seed);
     noise.set_noise_type(NoiseType::SimplexFractal);
     noise.set_fractal_type(FractalType::FBM);
-    noise.set_fractal_octaves(6);
-    noise.set_fractal_gain(0.05);
-    noise.set_fractal_lacunarity(0.5);
-    noise.set_frequency(1.9);
+    noise.set_fractal_octaves(config.octaves);
+    noise.set_fractal_gain(config.gain);
+    noise.set_fractal_lacunarity(config.lacunarity);
+    noise.set_frequency(config.frequency);
     noise
 }
 
 fn tree_perlin(seed: u64) -> FastNoise {
+    let config = match load_settings("treeperlin") {
+        Ok(config) => config,
+        Err(_) => panic!("Could not load treeperlin settings"),
+    };
     let mut noise = FastNoise::seeded(seed);
     noise.set_noise_type(NoiseType::SimplexFractal);
     noise.set_fractal_type(FractalType::FBM);
-    noise.set_fractal_octaves(6);
-    noise.set_fractal_gain(0.1);
-    noise.set_fractal_lacunarity(2.0);
-    noise.set_frequency(1.5);
+    noise.set_fractal_octaves(config.octaves);
+    noise.set_fractal_gain(config.gain);
+    noise.set_fractal_lacunarity(config.lacunarity);
+    noise.set_frequency(config.frequency);
     noise
 }
+

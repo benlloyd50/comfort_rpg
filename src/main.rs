@@ -1,6 +1,7 @@
 mod constants;
 mod effects;
 mod entity_tile_pos;
+mod comfort_config;
 
 mod assets;
 use assets::AssetLoadPlugin;

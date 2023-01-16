@@ -1,0 +1,12 @@
+[terrainperlin]
+octaves = 6
+gain = 0.05
+lacunarity = 0.7
+frequency = 1.9
+
+[treeperlin]
+octaves = 6
+gain = 0.1
+lacunarity = 0.2 
+frequency = 1.5
+
