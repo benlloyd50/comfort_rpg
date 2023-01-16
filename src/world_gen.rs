@@ -7,6 +7,7 @@
  */
 use bracket_noise::prelude::*;
 use rand::Rng;
+use std::time::Instant;
 
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
@@ -51,6 +52,7 @@ pub struct GameWorld {
 }
 
 fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
+    let start = Instant::now();
     let tilemap_size = world_size();
 
     let mut overworld = GameWorld {
@@ -90,7 +92,8 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
         },
         Blocking,
     ));
-    println!("World Created succesfully");
+    let duration = start.elapsed();
+    println!("World created succesfully in {:?}", duration);
 }
 
 fn regenerate_world(

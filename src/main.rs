@@ -17,6 +17,7 @@ use player::PlayerPlugin;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy_ecs_tilemap::TilemapPlugin;
+use bevy_pixel_camera::PixelCameraPlugin;
 use iyes_loopless::prelude::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -30,6 +31,7 @@ fn main() {
     App::new()
         .add_loopless_state(AppState::AssetLoading) // Starting state which leads to the plugin doing its job first
         .add_plugin(DefaultPluginsWithImage)
+        // .add_plugin(PixelCameraPlugin)
         .add_plugin(AssetLoadPlugin)
         .add_plugin(TilemapPlugin)
         .add_plugin(WorldGenerationPlugin)
@@ -37,6 +39,7 @@ fn main() {
         .add_plugin(PlayerPlugin)
         .add_plugin(InteractPlugin)
         .add_system(run_game.run_in_state(AppState::GameLoading))
+        .add_system(bevy::window::close_on_esc)
         .run();
 }
 
@@ -52,8 +55,8 @@ impl Plugin for DefaultPluginsWithImage {
             DefaultPlugins
                 .set(WindowPlugin {
                     window: WindowDescriptor {
-                        width: 640.0,
-                        height: 480.0,
+                        width: 1080.0,
+                        height: 720.0,
                         title: "Comfort RPG PROTOTYPE".to_string(),
                         present_mode: PresentMode::AutoVsync,
                         resizable: false,
