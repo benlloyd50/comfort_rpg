@@ -23,8 +23,8 @@
 - inspectable text on random things (almost everything)
 
 ## Prototype
-- [ ] Generate World
-- [ ] Move Player around world
+- [X] Generate World
+- [X] Move Player around world
 - [ ] Gather resources
 - [ ] Craft resources into materials then into deployables
 - [ ] Build with the deployables

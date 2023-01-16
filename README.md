@@ -12,4 +12,4 @@
 # Screenshots
 ![World Generation](screenshots/comfort_rpg_worldgen2.gif)
 ![In game forest](screenshots/forest1.png)
-![In game forest with player](screenshots/player1.png)
+![In game flowers with player](screenshots/flowers1.png)

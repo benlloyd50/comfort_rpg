@@ -2,7 +2,7 @@
  *
  * Goals of this file:
  *    To create unique fun interesting worlds that the player will want to explore and enjoy
- *    To keep functions clean and reusable if necessary under 30 locs per function if possible
+ *    To keep functions clean and reusable with the builder pattern
  *
  */
 use bracket_noise::prelude::*;
@@ -36,49 +36,53 @@ impl Plugin for WorldGenerationPlugin {
     }
 }
 
-// pub struct OverWorld {
-//     floor_tiles: TileStorage,
-//     floor_tilemap: Entity,
-//     objs_tiles: TileStorage,
-//     objes_tilemap: Entity
-// }
+pub struct GameWorld {
+    // Floor tiles are the underlying tiles to everything in the overworld, should NEVER be empty,
+    // limited to the terrain atlas
+    floor_tiles: TileStorage,
+    floor_tilemap: Entity,
+    // Objs tiles are the items, world objects, special terrain features that appear on top of the floor
+    // limited to the world_objs atlas
+    objs_tiles: TileStorage,
+    objs_tilemap: Entity,
+    // TilePos that cannot have anything else placed ontop of them
+    blocked_tiles: Vec<TilePos>,
+    seed: u64,
+}
 
 fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
     let tilemap_size = world_size();
 
-    // Floor tiles are the underlying tiles to everything in the overworld, should NEVER be empty,
-    // limited to the terrain atlas
-    let mut floor_tiles = TileStorage::empty(tilemap_size);
-    let floor_tilemap = commands.spawn_empty().id();
+    let mut overworld = GameWorld {
+        floor_tiles: TileStorage::empty(tilemap_size),
+        floor_tilemap: commands.spawn_empty().id(),
+        objs_tiles: TileStorage::empty(tilemap_size),
+        objs_tilemap: commands.spawn_empty().id(),
+        blocked_tiles: Vec::new(),
+        // TODO: allow user to input a seed, maybe using a config file?
+        seed: rand::random::<u64>(),
+    };
 
-    // Objs tiles are the items, world objects, special terrain features that appear on top of the floor
-    // limited to the world_objs atlas
-    let mut objs_tiles = TileStorage::empty(tilemap_size);
-    let objs_tilemap = commands.spawn_empty().id();
-
-    // TODO: allow user to input a seed, maybe using a config file?
-    let seed = rand::random::<u64>();
 
     // Spawn the elements of the tilemaps.
-    spawn_terrain(&mut commands, &mut floor_tiles, floor_tilemap, seed);
-    spawn_trees(&mut commands, &mut objs_tiles, objs_tilemap, seed);
+    overworld.spawn_terrain(&mut commands).spawn_trees(&mut commands).spawn_flowers(&mut commands);
 
-    commands.entity(floor_tilemap).insert(TilemapBundle {
+    commands.entity(overworld.floor_tilemap).insert(TilemapBundle {
         grid_size: tilegridsize_pixels(),
         map_type: TilemapType::default(),
         size: tilemap_size,
-        storage: floor_tiles,
+        storage: overworld.floor_tiles,
         texture: TilemapTexture::Single(tiles.terrain.clone()),
         tile_size: tilemaptilesize_pixels(),
         transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
         ..Default::default()
     });
-    commands.entity(objs_tilemap).insert((
+    commands.entity(overworld.objs_tilemap).insert((
         TilemapBundle {
             grid_size: tilegridsize_pixels(),
             map_type: TilemapType::default(),
             size: tilemap_size,
-            storage: objs_tiles,
+            storage: overworld.objs_tiles,
             texture: TilemapTexture::Single(tiles.world_objs.clone()),
             tile_size: tilemaptilesize_pixels(),
             transform: Transform::from_translation(Vec3::new(0f32, 0f32, OBJECT_Z)),
@@ -117,75 +121,104 @@ fn regenerate_world(
     create_world(commands, sprites);
 }
 
-/// Fills walkable_tiles with terrain and fills blocked_tiles with water
-fn spawn_terrain(
-    commands: &mut Commands,
-    floor_tiles: &mut TileStorage,
-    map_entity: Entity,
-    seed: u64,
-) {
-    let noise = terrain_perlin(seed);
-    let mut rng = rand::thread_rng();
-    for x in 0..MAP_SIZE_X {
-        for y in 0..MAP_SIZE_Y {
-            let tile_pos = TilePos { x, y };
+impl GameWorld {
+    /// Fills walkable_tiles with terrain and fills blocked_tiles with water
+    fn spawn_terrain(
+        &mut self,
+        commands: &mut Commands,
+    ) -> &mut GameWorld {
+        let noise = terrain_perlin(self.seed);
+        let mut rng = rand::thread_rng();
+        for x in 0..MAP_SIZE_X {
+            for y in 0..MAP_SIZE_Y {
+                let tile_pos = TilePos { x, y };
 
-            let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
-            perlin_value = (perlin_value + 1.0) * 0.5;
+                let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
+                perlin_value = (perlin_value + 1.0) * 0.5;
 
-            let tile_entity = commands.spawn_empty().id();
-            let texture_index = if perlin_value > 0.05f32 && perlin_value < 0.2f32 {
-                // Water
-                commands.entity(tile_entity).insert(Blocking);
-                TileTextureIndex(13)
-            } else {
-                let foilage_percent = rng.gen::<u32>() % 100;
-                let foilage_type = rng.gen_range(1..5);
-                if foilage_percent >= 20 {
-                    TileTextureIndex(0)
+                let tile_entity = commands.spawn_empty().id();
+                let texture_index = if perlin_value > 0.05f32 && perlin_value < 0.2f32 {
+                    // Water
+                    commands.entity(tile_entity).insert(Blocking);
+                    self.blocked_tiles.push(tile_pos);
+                    TileTextureIndex(13)
                 } else {
-                    TileTextureIndex(foilage_type)
+                    let foilage_percent = rng.gen_range(0..100);
+                    let foilage_type = rng.gen_range(1..5);
+                    if foilage_percent >= 20 {
+                        TileTextureIndex(0)
+                    } else {
+                        TileTextureIndex(foilage_type)
+                    }
+                };
+                commands.entity(tile_entity).insert(TileBundle {
+                        position: tile_pos,
+                        tilemap_id: TilemapId(self.floor_tilemap),
+                        texture_index,
+                        ..Default::default()
+                    });
+
+                self.floor_tiles.set(&tile_pos, tile_entity);
+            }
+        }
+
+        self
+    }
+
+    /// Spawns trees inside the world
+    fn spawn_trees(&mut self, commands: &mut Commands) -> &mut GameWorld {
+        let noise = tree_perlin(self.seed);
+
+        for x in 0..MAP_SIZE_X {
+            for y in (0..MAP_SIZE_Y).step_by(2) {
+                let tree_base_pos = TilePos { x, y };
+                let tree_top_pos = TilePos { x, y: y + 1 };
+
+                if self.blocked_tiles.contains(&tree_base_pos) || self.blocked_tiles.contains(&tree_top_pos) {
+                    continue;
                 }
-            };
-            commands.entity(tile_entity).insert( TileBundle {
-                    position: tile_pos,
-                    tilemap_id: TilemapId(map_entity),
-                    texture_index,
-                    ..Default::default()
-                });
 
-            floor_tiles.set(&tile_pos, tile_entity);
+                let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
+                perlin_value = (perlin_value + 1.0) * 0.5;
+
+                if perlin_value < 0.2f32 || perlin_value > 0.6f32 {
+                    //spawn object
+                    let (base_entity, top_entity) = place_medium_tree(commands, &self.objs_tilemap, &tree_base_pos);
+                    self.objs_tiles.set(&tree_base_pos, base_entity);
+                    self.objs_tiles.set(&tree_top_pos, top_entity);
+                }
+            }
         }
+
+        self
+    }
+
+    /// Spawns flowers on tiles that do not block
+    fn spawn_flowers(&mut self, commands: &mut Commands) -> &mut GameWorld {
+        let mut rng = rand::thread_rng();
+        for x in 0..MAP_SIZE_X {
+            for y in 0..MAP_SIZE_Y {
+                let tile_pos = TilePos { x, y };
+                if self.blocked_tiles.contains(&tile_pos) {
+                    continue;
+                }
+
+                let foilage_percent = rng.gen_range(0..100);
+                if foilage_percent <= 2 {
+                    commands.spawn(TileBundle{
+                        position: tile_pos,
+                        texture_index: TileTextureIndex(rng.gen_range(2..8)),
+                        tilemap_id: TilemapId(self.objs_tilemap),
+                        ..default()
+                    });
+                }
+            }
+        }
+
+        self
     }
 }
 
-fn spawn_trees(commands: &mut Commands, objs_tiles: &mut TileStorage, objs_tilemap: Entity, seed: u64) {
-    let noise = tree_perlin(seed);
-
-    for x in 0..MAP_SIZE_X {
-        for y in (0..MAP_SIZE_Y).step_by(2) {
-            let tree_base_pos = TilePos { x, y };
-            let tree_top_pos = TilePos { x, y: y + 1 };
-
-            if let Some(_) = objs_tiles.checked_get(&tree_top_pos) {
-                continue;
-            }
-            if let Some(_) = objs_tiles.checked_get(&tree_base_pos) {
-                continue;
-            }
-
-            let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
-            perlin_value = (perlin_value + 1.0) * 0.5;
-
-            if perlin_value < 0.2f32 || perlin_value > 0.6f32 {
-                //spawn object
-                let (base_entity, top_entity) = place_medium_tree(commands, &objs_tilemap, &tree_base_pos);
-                objs_tiles.set(&tree_base_pos, base_entity);
-                objs_tiles.set(&tree_top_pos, top_entity);
-            }
-        }
-    }
-}
 
 fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_base_pos: &TilePos) -> (Entity, Entity) {
     let base_entity = commands
@@ -292,9 +325,9 @@ fn terrain_perlin(seed: u64) -> FastNoise {
     noise.set_noise_type(NoiseType::SimplexFractal);
     noise.set_fractal_type(FractalType::FBM);
     noise.set_fractal_octaves(6);
-    noise.set_fractal_gain(0.1);
-    noise.set_fractal_lacunarity(2.0);
-    noise.set_frequency(1.5);
+    noise.set_fractal_gain(0.05);
+    noise.set_fractal_lacunarity(0.5);
+    noise.set_frequency(1.9);
     noise
 }
 
