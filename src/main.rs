@@ -17,7 +17,6 @@ use player::PlayerPlugin;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy_ecs_tilemap::TilemapPlugin;
-use bevy_pixel_camera::PixelCameraPlugin;
 use iyes_loopless::prelude::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -31,7 +30,6 @@ fn main() {
     App::new()
         .add_loopless_state(AppState::AssetLoading) // Starting state which leads to the plugin doing its job first
         .add_plugin(DefaultPluginsWithImage)
-        // .add_plugin(PixelCameraPlugin)
         .add_plugin(AssetLoadPlugin)
         .add_plugin(TilemapPlugin)
         .add_plugin(WorldGenerationPlugin)

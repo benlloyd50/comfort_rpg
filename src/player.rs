@@ -9,7 +9,7 @@ use crate::{
     effects::lerp,
     entity_tile_pos::EntityTilePos,
     interact::{HealthBelowZeroEvent, Interact},
-    world_gen::{within_bounds, Blocking},
+    world_gen::{within_bounds, Blocking, ObjectSize},
     AppState,
 };
 
@@ -148,8 +148,10 @@ fn update_sprite_position<Type: Component>(mut entity_q: Query<(&mut Transform, 
 /// Checks to ensure dest tile is inbounds of the map
 fn directional_input_handle(
     mut player_q: Query<(Entity, &EntityTilePos, &mut Direction), With<Player>>,
-    interactables_q: Query<(Entity, &TilePos), With<Interact>>,
     blocking_q: Query<&TilePos, With<Blocking>>,
+    blocking_interact_q: Query<(Entity, &TilePos), (With<Interact>, With<Blocking>)>,
+    obj_tiles_q: Query<(Entity, &ObjectSize, &TilePos)>,
+    tile_storage_q: Query<&TileStorage>,
     keeb: Res<Input<KeyCode>>,
     mut ev_moveplayer: EventWriter<MoveEvent>,
     mut ev_interact: EventWriter<Interaction>,
@@ -187,16 +189,32 @@ fn directional_input_handle(
         y: dest_tile.y as u32,
     };
 
-    // if there are any in here then we cant move
-    if let Some((interactable_entity, _)) = interactables_q.iter().find(|(_, elem)| dest_tile.eq(elem)) {
-        ev_interact.send(Interaction { sender: player_entity, reciever: interactable_entity });
-    }
-    else if let Some(_) = blocking_q.iter().find(|elem| dest_tile.eq(elem)) {
+    // check if the tile is an interactable
+    //   is the dest_tile part of a multi tile -> get owner entity
+    //   is the owner entity in the interactable query -> get entity with components
+    //   give entity to the interact system
+    if let Some((dest_entity, size, _)) = obj_tiles_q.iter().find(|x| dest_tile.eq(x.2)) {
+        match *size {
+            ObjectSize::Single => {
+                ev_interact.send(Interaction { sender: player_entity, reciever: dest_entity});
+            },
+            ObjectSize::Multi(owner) => {
+                if let Ok(_) = blocking_interact_q.get(owner) {
+                    ev_interact.send(Interaction { sender: player_entity, reciever: owner});
+                };
+            },
+        }
+    } else if let Some(_) = blocking_q.iter().find(|elem| dest_tile.eq(elem)) {
         return;
     }
     else {
         ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
     }
+
+
+    // if let Some((interactable_entity, _)) = blocking_interact_q.iter().find(|(_, elem)| dest_tile.eq(elem)) {
+    //     ev_interact.send(Interaction { sender: player_entity, reciever: interactable_entity });
+    // }
 }
 
 fn player_interact_handler(
@@ -206,15 +224,18 @@ fn player_interact_handler(
     mut ev_killed: EventWriter<HealthBelowZeroEvent>,
 ) {
     for ev in ev_interact.iter() {
+        //TODO: remove this if not necessary
         let _ = match player_q.get_mut(ev.sender) {
             Ok(player_entity) => player_entity,
             Err(_) => return,
         };
+
         let mut interact = match interactables_q.get_mut(ev.reciever) {
             Ok(interact) => interact,
             Err(_) => return,
         };
         match &mut *interact.0 {
+            // TODO: this should be moved into their own interact fns
             Interact::Harvest(health) => {
                 if health.hp <= 0 {
                     return;

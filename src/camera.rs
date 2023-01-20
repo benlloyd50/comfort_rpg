@@ -4,7 +4,6 @@ use crate::{
     AppState, 
 };
 use bevy::{input::mouse::MouseWheel, prelude::*};
-use bevy_pixel_camera::PixelCameraBundle;
 use iyes_loopless::prelude::*;
 
 const CAM_Z: f32 = 100.; // Generally the highest depth and sprites past it will not be rendered
@@ -30,12 +29,11 @@ struct CamScrollLock(bool);
 
 fn load_camera(mut commands: Commands) {
     let _camera_entity = commands
-        // .spawn(PixelCameraBundle::from_resolution(160, 120));
         .spawn((
             Camera2dBundle {
                 transform: Transform::from_xyz(0.0, 0.0, CAM_Z),
                 projection: OrthographicProjection {
-                    scale: 1.0,
+                    scale: 0.5,
                     ..default()
                 },
                 ..default()

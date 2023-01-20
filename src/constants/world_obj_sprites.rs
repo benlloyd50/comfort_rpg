@@ -1,3 +1,4 @@
+// Position of sprites inside the world_objs.png
 #![allow(dead_code)]
 
 pub const TREE_TOP: u32 = 0;
