@@ -196,21 +196,25 @@ fn directional_input_handle(
     if let Some((dest_entity, size, _)) = obj_tiles_q.iter().find(|x| dest_tile.eq(x.2)) {
         match *size {
             ObjectSize::Single => {
-                ev_interact.send(Interaction { sender: player_entity, reciever: dest_entity});
-            },
+                ev_interact.send(Interaction {
+                    sender: player_entity,
+                    reciever: dest_entity,
+                });
+            }
             ObjectSize::Multi(owner) => {
                 if let Ok(_) = blocking_interact_q.get(owner) {
-                    ev_interact.send(Interaction { sender: player_entity, reciever: owner});
+                    ev_interact.send(Interaction {
+                        sender: player_entity,
+                        reciever: owner,
+                    });
                 };
-            },
+            }
         }
     } else if let Some(_) = blocking_q.iter().find(|elem| dest_tile.eq(elem)) {
         return;
-    }
-    else {
+    } else {
         ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
     }
-
 
     // if let Some((interactable_entity, _)) = blocking_interact_q.iter().find(|(_, elem)| dest_tile.eq(elem)) {
     //     ev_interact.send(Interaction { sender: player_entity, reciever: interactable_entity });

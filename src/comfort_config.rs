@@ -1,6 +1,6 @@
+use serde::Deserialize;
 use std::error::Error;
 use std::fs;
-use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct ComfortConfig {
@@ -25,4 +25,3 @@ pub fn load_settings(preset: &str) -> Result<FractalSettings, Box<dyn Error>> {
         _ => Ok(decoded.terrainperlin),
     }
 }
-

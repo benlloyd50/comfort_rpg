@@ -14,8 +14,7 @@ use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    assets::SpriteAssets, comfort_config::load_settings, constants::world_obj_sprites::*,
-    interact::*, AppState,
+    assets::SpriteAssets, comfort_config::load_settings, constants::world_obj_sprites::*, interact::*, AppState,
 };
 
 pub const MAP_SIZE_X: u32 = 128; // Size of map currently only supports square maps
@@ -74,18 +73,16 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
         .spawn_trees(&mut commands)
         .spawn_flowers(&mut commands);
 
-    commands
-        .entity(overworld.floor_tilemap)
-        .insert(TilemapBundle {
-            grid_size: tilegridsize_pixels(),
-            map_type: TilemapType::default(),
-            size: tilemap_size,
-            storage: overworld.floor_tiles,
-            texture: TilemapTexture::Single(tiles.terrain.clone()),
-            tile_size: tilemaptilesize_pixels(),
-            transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
-            ..Default::default()
-        });
+    commands.entity(overworld.floor_tilemap).insert(TilemapBundle {
+        grid_size: tilegridsize_pixels(),
+        map_type: TilemapType::default(),
+        size: tilemap_size,
+        storage: overworld.floor_tiles,
+        texture: TilemapTexture::Single(tiles.terrain.clone()),
+        tile_size: tilemaptilesize_pixels(),
+        transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
+        ..Default::default()
+    });
     commands.entity(overworld.objs_tilemap).insert((
         TilemapBundle {
             grid_size: tilegridsize_pixels(),
@@ -181,9 +178,7 @@ impl GameWorld {
                 let tree_base_pos = TilePos { x, y };
                 let tree_top_pos = TilePos { x, y: y + 1 };
 
-                if self.blocked_tiles.contains(&tree_base_pos)
-                    || self.blocked_tiles.contains(&tree_top_pos)
-                {
+                if self.blocked_tiles.contains(&tree_base_pos) || self.blocked_tiles.contains(&tree_top_pos) {
                     continue;
                 }
 
@@ -192,8 +187,7 @@ impl GameWorld {
 
                 if perlin_value < 0.2f32 || perlin_value > 0.6f32 {
                     //spawn object
-                    let (base_entity, top_entity) =
-                        place_medium_tree(commands, &self.objs_tilemap, &tree_base_pos);
+                    let (base_entity, top_entity) = place_medium_tree(commands, &self.objs_tilemap, &tree_base_pos);
                     self.objs_tiles.set(&tree_base_pos, base_entity);
                     self.objs_tiles.set(&tree_top_pos, top_entity);
                 }
@@ -229,11 +223,7 @@ impl GameWorld {
     }
 }
 
-fn place_medium_tree(
-    commands: &mut Commands,
-    blocked_tilemap: &Entity,
-    tree_base_pos: &TilePos,
-) -> (Entity, Entity) {
+fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_base_pos: &TilePos) -> (Entity, Entity) {
     let base_entity = commands.spawn_empty().id();
     let top_entity = commands.spawn_empty().id();
     let obj_size = ObjectSize::Multi(base_entity);
@@ -266,10 +256,7 @@ fn place_medium_tree(
     (base_entity, top_entity)
 }
 
-fn stretch_tree(
-    mut tree_q: Query<(&mut Transform, &TilePos), With<Tree>>,
-    keeb: Res<Input<KeyCode>>,
-) {
+fn stretch_tree(mut tree_q: Query<(&mut Transform, &TilePos), With<Tree>>, keeb: Res<Input<KeyCode>>) {
     if keeb.pressed(KeyCode::K) {
         for (mut transform, _) in tree_q.iter_mut() {
             transform.scale.x += 0.06;
@@ -328,8 +315,7 @@ fn tilemaptilesize_pixels() -> TilemapTileSize {
 
 //====> World Data Components
 // Marks a tile as being part of an object, the Entity will contain the data for the object
-#[derive(Clone, Copy)]
-#[derive(Component)]
+#[derive(Clone, Copy, Component)]
 pub enum ObjectSize {
     Single,
     Multi(Entity),

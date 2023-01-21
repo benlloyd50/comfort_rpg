@@ -6,7 +6,7 @@ pub struct InteractPlugin;
 
 impl Plugin for InteractPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<HealthBelowZeroEvent>().add_system(destroy_dead);
+        app.add_event::<HealthBelowZeroEvent>().add_system(cleanup_world_objs);
     }
 }
 
@@ -35,17 +35,32 @@ impl Health {
     }
 }
 
-//TODO: update all entities that relate to the tileobj
-fn destroy_dead(
+// Removes dead world objs that are sent via the HealthBelowZeroEvent
+fn cleanup_world_objs(
     mut commands: Commands,
     mut ev_killed: EventReader<HealthBelowZeroEvent>,
     mut tile_storage_q: Query<&mut TileStorage, With<Blocking>>,
+    world_objs_q: Query<(Entity, &ObjectSize, &TilePos)>,
 ) {
-    //
     for ev in ev_killed.iter() {
-        for mut tile_storage in tile_storage_q.iter_mut() {
-            tile_storage.remove(&ev.1);
+        for (obj, obj_size, obj_pos) in world_objs_q.iter() {
+            match obj_size {
+                ObjectSize::Single => {
+                    for mut tile_storage in tile_storage_q.iter_mut() {
+                        tile_storage.remove(&ev.1);
+                    }
+                    commands.entity(ev.0).despawn_recursive();
+                }
+                ObjectSize::Multi(owner) => {
+                    if *owner == ev.0 {
+                        // will remove the owner and the tiles associated with the owner
+                        for mut tile_storage in tile_storage_q.iter_mut() {
+                            tile_storage.remove(obj_pos);
+                        }
+                        commands.entity(obj).despawn_recursive();
+                    }
+                }
+            }
         }
-        commands.entity(ev.0).despawn_recursive();
     }
 }

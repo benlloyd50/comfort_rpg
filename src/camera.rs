@@ -1,7 +1,7 @@
 use crate::{
     effects::lerp,
     player::{Player, SystemOrder},
-    AppState, 
+    AppState,
 };
 use bevy::{input::mouse::MouseWheel, prelude::*};
 use iyes_loopless::prelude::*;
@@ -12,8 +12,8 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, load_camera)
-         .add_system_set( ConditionSet::new()
+        app.add_enter_system(AppState::GameLoading, load_camera).add_system_set(
+            ConditionSet::new()
                 .run_in_state(AppState::Running)
                 .label("graphicDelay")
                 .after(SystemOrder::Graphic)
@@ -52,7 +52,7 @@ fn camera_follow_player(
     let player_pos = player_q.single();
 
     let lerped_pos = lerp(cam_pos.translation.truncate(), player_pos.translation.truncate(), 0.15);
-   
+
     // Bound the position by the map so we dont see what's past it
     // let x_offset = cam_pos.scale.x * 39.5 * TILE_PIXELS_X;
     // let y_offset = cam_pos.scale.x * 39.5 * TILE_PIXELS_Y;
