@@ -1094,6 +1094,7 @@ dependencies = [
  "iyes_loopless",
  "rand",
  "serde",
+ "serde_json",
  "toml",
 ]
 

@@ -35,6 +35,3 @@
 - Mining ideas, multi block hit so you can hit multiple blocks
 - Certain terrain could require upgraded materials
 
-## MultiTile problem
-- we have a dest_tile we need to see if an interactable object exists there
-- interactable objects can take from 1 to many tilepos

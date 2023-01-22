@@ -17,7 +17,7 @@ pub struct FractalSettings {
 }
 
 pub fn load_settings(preset: &str) -> Result<FractalSettings, Box<dyn Error>> {
-    let contents = fs::read_to_string("config/config.toml")?;
+    let contents = fs::read_to_string("config/worldgen.toml")?;
     let decoded: ComfortConfig = toml::from_str(&contents).unwrap();
     match preset {
         "terrainperlin" => Ok(decoded.terrainperlin),

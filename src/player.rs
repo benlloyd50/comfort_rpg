@@ -151,7 +151,6 @@ fn directional_input_handle(
     blocking_q: Query<&TilePos, With<Blocking>>,
     blocking_interact_q: Query<(Entity, &TilePos), (With<Interact>, With<Blocking>)>,
     obj_tiles_q: Query<(Entity, &ObjectSize, &TilePos)>,
-    tile_storage_q: Query<&TileStorage>,
     keeb: Res<Input<KeyCode>>,
     mut ev_moveplayer: EventWriter<MoveEvent>,
     mut ev_interact: EventWriter<Interaction>,

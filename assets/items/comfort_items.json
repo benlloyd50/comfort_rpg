@@ -1,0 +1,12 @@
+[
+    {
+        "id": 1,
+        "name": "wood",
+        "atlas_index": 1
+    },
+    {
+        "id": 2,
+        "name": "stone",
+        "atlas_index": 2
+    }
+]

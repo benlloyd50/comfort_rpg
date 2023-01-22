@@ -13,6 +13,8 @@ mod camera;
 use camera::CameraPlugin;
 mod player;
 use player::PlayerPlugin;
+mod item_util;
+use item_util::ItemUtilPlugin;
 
 use bevy::prelude::*;
 use bevy::window::PresentMode;
@@ -36,6 +38,7 @@ fn main() {
         .add_plugin(CameraPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(InteractPlugin)
+        .add_plugin(ItemUtilPlugin)
         .add_system(run_game.run_in_state(AppState::GameLoading))
         .add_system(bevy::window::close_on_esc)
         .run();
