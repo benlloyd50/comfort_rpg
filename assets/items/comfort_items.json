@@ -8,5 +8,20 @@
         "id": 2,
         "name": "stone",
         "atlas_index": 2
+    },
+    {
+        "id": 3,
+        "name": "stone pickaxe",
+        "atlas_index": 3
+    },
+    {
+        "id": 4,
+        "name": "stone hatchet",
+        "atlas_index": 4
+    },
+    {
+        "id": 5,
+        "name": "stone shovel",
+        "atlas_index": 5
     }
 ]

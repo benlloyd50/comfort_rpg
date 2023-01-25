@@ -73,20 +73,23 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
         .spawn_trees(&mut commands)
         .spawn_flowers(&mut commands);
 
-    commands.entity(overworld.floor_tilemap).insert(TilemapBundle {
-        grid_size: tilegridsize_pixels(),
-        map_type: TilemapType::default(),
-        size: tilemap_size,
-        storage: overworld.floor_tiles,
-        texture: TilemapTexture::Single(tiles.terrain.clone()),
-        tile_size: tilemaptilesize_pixels(),
-        transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
-        ..Default::default()
-    });
+    commands.entity(overworld.floor_tilemap).insert((
+        TilemapBundle {
+            grid_size: tilegridsize_pixels(),
+            map_type: TilemapType::Square,
+            size: tilemap_size,
+            storage: overworld.floor_tiles,
+            texture: TilemapTexture::Single(tiles.terrain.clone()),
+            tile_size: tilemaptilesize_pixels(),
+            transform: Transform::from_translation(Vec3::new(0f32, 0f32, FLOOR_Z)),
+            ..Default::default()
+        },
+        GroundStorage,
+    ));
     commands.entity(overworld.objs_tilemap).insert((
         TilemapBundle {
             grid_size: tilegridsize_pixels(),
-            map_type: TilemapType::default(),
+            map_type: TilemapType::Square,
             size: tilemap_size,
             storage: overworld.objs_tiles,
             texture: TilemapTexture::Single(tiles.world_objs.clone()),
@@ -94,6 +97,7 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
             transform: Transform::from_translation(Vec3::new(0f32, 0f32, OBJECT_Z)),
             ..Default::default()
         },
+        ObjectStorage,
         Blocking,
     ));
     let duration = start.elapsed();
@@ -299,14 +303,14 @@ pub fn world_size() -> TilemapSize {
     }
 }
 
-fn tilegridsize_pixels() -> TilemapGridSize {
+pub fn tilegridsize_pixels() -> TilemapGridSize {
     TilemapGridSize {
         x: TILE_PIXELS_X,
         y: TILE_PIXELS_Y,
     }
 }
 
-fn tilemaptilesize_pixels() -> TilemapTileSize {
+pub fn tilemaptilesize_pixels() -> TilemapTileSize {
     TilemapTileSize {
         x: TILE_PIXELS_X,
         y: TILE_PIXELS_Y,
@@ -320,6 +324,14 @@ pub enum ObjectSize {
     Single,
     Multi(Entity),
 }
+
+// Describes the tile storage's main purpose
+#[derive(Component)]
+pub struct GroundStorage;
+#[derive(Component)]
+pub struct ItemStorage;
+#[derive(Component)]
+pub struct ObjectStorage;
 
 // Marks the tile_entity to denote it is unpassable
 #[derive(Component)]

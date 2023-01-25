@@ -9,6 +9,7 @@ use crate::{
     effects::lerp,
     entity_tile_pos::EntityTilePos,
     interact::{HealthBelowZeroEvent, Interact},
+    item_util::SpawnItemEvent,
     world_gen::{within_bounds, Blocking, ObjectSize},
     AppState,
 };
@@ -78,6 +79,7 @@ struct MoveEvent(Entity, TilePos);
 struct Interaction {
     sender: Entity,
     reciever: Entity,
+    reciever_pos: TilePos,
 }
 
 /// Timer used as an sleeper for held actions
@@ -198,6 +200,7 @@ fn directional_input_handle(
                 ev_interact.send(Interaction {
                     sender: player_entity,
                     reciever: dest_entity,
+                    reciever_pos: dest_tile,
                 });
             }
             ObjectSize::Multi(owner) => {
@@ -205,6 +208,7 @@ fn directional_input_handle(
                     ev_interact.send(Interaction {
                         sender: player_entity,
                         reciever: owner,
+                        reciever_pos: dest_tile,
                     });
                 };
             }
@@ -225,6 +229,7 @@ fn player_interact_handler(
     mut interactables_q: Query<(&mut Interact, Entity, &TilePos)>,
     mut ev_interact: EventReader<Interaction>,
     mut ev_killed: EventWriter<HealthBelowZeroEvent>,
+    mut ev_spawnitem: EventWriter<SpawnItemEvent>,
 ) {
     for ev in ev_interact.iter() {
         //TODO: remove this if not necessary
@@ -247,6 +252,7 @@ fn player_interact_handler(
                 println!("struck tree with fist hp: {}", health.hp);
                 if health.hp <= 0 {
                     ev_killed.send(HealthBelowZeroEvent(interact.1, *interact.2));
+                    ev_spawnitem.send(SpawnItemEvent::from(ev.reciever_pos.x, ev.reciever_pos.y, 1));
                     println!("tree is dead");
                 }
             }
