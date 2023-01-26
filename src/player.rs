@@ -15,7 +15,7 @@ use crate::{
 
 pub const PLAYER_Z: f32 = 50.0;
 const PLAYER_TILE_SPEED: u32 = 1;
-const PLAYER_MOVE_TIMER_MS: u64 = 100;
+const PLAYER_MOVE_TIMER_MS: u64 = 175;
 
 pub struct PlayerPlugin;
 
@@ -109,6 +109,8 @@ fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking
     ));
 }
 
+/// Moves the player target sprite in front of the player based on the last direction pressed,
+/// purely visually as actions calculate their own positions
 fn move_target(player_q: Query<(&EntityTilePos, &Direction)>, mut target_q: Query<&mut Transform, With<PlayerTarget>>) {
     if let Ok((player_tile_pos, dir)) = player_q.get_single() {
         if let Ok(mut target) = target_q.get_single_mut() {
@@ -125,13 +127,10 @@ fn move_target(player_q: Query<(&EntityTilePos, &Direction)>, mut target_q: Quer
 /// Moves player entity from input
 fn move_player(mut player_q: Query<&mut EntityTilePos>, mut ev_move: EventReader<MoveEvent>) {
     for ev in ev_move.iter() {
-        match player_q.get_mut(ev.0) {
-            Ok(mut player_tile_pos) => {
-                player_tile_pos.x = ev.1.x;
-                player_tile_pos.y = ev.1.y;
-            }
-            Err(_) => {}
-        };
+    if let Ok(mut player_tile_pos) = player_q.get_mut(ev.0) {
+             player_tile_pos.x = ev.1.x;
+             player_tile_pos.y = ev.1.y;
+         };
     }
 }
 
@@ -140,9 +139,6 @@ fn movement_cooldown(mut timer_q: Query<&mut HeldTimer, With<Player>>, time: Res
     let mut move_time = timer_q.single_mut();
     move_time.0.tick(time.delta());
     move_time.0.finished()
-    // if keeb.any_just_released([KeyCode::D, KeyCode::A, KeyCode::S, KeyCode::W]) {
-    //     move_time.0.tick(Duration::from_millis(PLAYER_MOVE_TIMER_MS));
-    // }   // Too much power cannot slow down
 }
 
 /// Updates the sprite position based on a discrete position in the entity
@@ -197,9 +193,7 @@ fn directional_input_handle(
 
     // if the objects 
     for (_, size, blocking) in obj_tiles_q.iter().filter(|x| dest_tile.eq(x.0)) {
-        if let Some(_) = size {
-            return;
-        } else if let Some(_) = blocking {
+        if size.is_some() || blocking.is_some() {
             return;
         }
     }
@@ -244,7 +238,7 @@ fn player_harvest_action(
                 });
             }
             ObjectSize::Multi(owner) => {
-                if let Ok(_) = blocking_interact_q.get(owner) {
+                if blocking_interact_q.get(owner).is_ok() {
                     ev_interact.send(HarvestInteraction {
                         harvester: player_entity,
                         harvested: owner,
