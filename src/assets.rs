@@ -36,4 +36,7 @@ pub struct SpriteAssets {
     #[asset(texture_atlas(tile_size_x = 8., tile_size_y = 16., columns = 1, rows = 1))]
     #[asset(path = "tree1.png")]
     pub tree: Handle<TextureAtlas>,
+
+    #[asset(path = "target_outline.png")]
+    pub target: Handle<Image>,
 }

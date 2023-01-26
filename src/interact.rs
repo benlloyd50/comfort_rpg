@@ -1,12 +1,27 @@
-use crate::world_gen::{Blocking, ObjectSize};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
+use iyes_loopless::prelude::*;
+
+use crate::{
+    item_util::SpawnItemEvent,
+    player::SystemOrder,
+    world_gen::{Blocking, ObjectSize},
+    AppState,
+};
 
 pub struct InteractPlugin;
 
 impl Plugin for InteractPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<HealthBelowZeroEvent>().add_system(cleanup_world_objs);
+        app.add_event::<HealthBelowZeroEvent>()
+            .add_event::<HarvestInteraction>()
+            .add_system(cleanup_world_objs)
+            .add_system(
+                harvest_interact_handler
+                    .run_in_state(AppState::Running)
+                    .label(SystemOrder::Logic)
+                    .after(SystemOrder::Input),
+            );
     }
 }
 
@@ -14,13 +29,14 @@ impl Plugin for InteractPlugin {
 #[derive(Component)]
 #[allow(dead_code)]
 pub enum Interact {
-    Harvest(Health),
-    Pickup(),
-    Consume(),
+    Harvest,
+    Pickup,
+    Consume,
 }
 
 pub struct HealthBelowZeroEvent(pub Entity, pub TilePos);
 
+#[derive(Component)]
 pub struct Health {
     pub max_hp: u32,
     pub hp: i32,
@@ -60,6 +76,34 @@ fn cleanup_world_objs(
                         commands.entity(obj).despawn_recursive();
                     }
                 }
+            }
+        }
+    }
+}
+
+pub struct HarvestInteraction {
+    pub harvester: Entity,       
+    pub harvested: Entity,     
+    pub reciever_pos: TilePos,
+}
+
+fn harvest_interact_handler(
+    mut interactables_q: Query<(Entity, &Interact, &mut Health, &TilePos)>,
+    mut ev_harvest: EventReader<HarvestInteraction>,
+    mut ev_destroyed: EventWriter<HealthBelowZeroEvent>,
+    mut ev_spawnitem: EventWriter<SpawnItemEvent>,
+) {
+    for ev in ev_harvest.iter() {
+        if let Ok((interactable, _, mut health, pos)) = interactables_q.get_mut(ev.harvested) {
+            if health.hp <= 0 {
+                return;
+            }
+            health.hp -= 2;
+            println!("struck obj with fist hp: {}", health.hp);
+            if health.hp <= 0 {
+                ev_destroyed.send(HealthBelowZeroEvent(interactable, *pos));
+                ev_spawnitem.send(SpawnItemEvent::from(ev.reciever_pos.x, ev.reciever_pos.y, 1));
+                println!("obj is dead");
             }
         }
     }

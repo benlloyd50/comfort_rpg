@@ -240,7 +240,8 @@ fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_bas
             ..default()
         },
         Tree,
-        Interact::Harvest(Health::new(5)),
+        Health::new(5),
+        Interact::Harvest,
         Blocking,
         obj_size.clone(),
     ));
@@ -320,6 +321,7 @@ pub fn tilemaptilesize_pixels() -> TilemapTileSize {
 //====> World Data Components
 // Marks a tile as being part of an object, the Entity will contain the data for the object
 #[derive(Clone, Copy, Component)]
+#[allow(dead_code)]
 pub enum ObjectSize {
     Single,
     Multi(Entity),

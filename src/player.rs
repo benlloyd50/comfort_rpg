@@ -8,15 +8,13 @@ use crate::{
     assets::SpriteAssets,
     effects::lerp,
     entity_tile_pos::EntityTilePos,
-    interact::{HealthBelowZeroEvent, Interact},
-    item_util::SpawnItemEvent,
+    interact::{Interact, HarvestInteraction},
     world_gen::{within_bounds, Blocking, ObjectSize},
     AppState,
 };
 
 pub const PLAYER_Z: f32 = 50.0;
 const PLAYER_TILE_SPEED: u32 = 1;
-const PLAYER_INTERACT_TIMER_MS: u64 = 600;
 const PLAYER_MOVE_TIMER_MS: u64 = 100;
 
 pub struct PlayerPlugin;
@@ -33,7 +31,6 @@ impl Plugin for PlayerPlugin {
         // Input => Logic => Graphic => cleanup
         app.add_enter_system(AppState::GameLoading, setup_character.after("map"))
             .add_event::<MoveEvent>()
-            .add_event::<Interaction>()
             .add_system(
                 move_player
                     .run_in_state(AppState::Running)
@@ -41,21 +38,23 @@ impl Plugin for PlayerPlugin {
                     .label(SystemOrder::Logic)
                     .after(SystemOrder::Input),
             )
-            .add_system(
-                directional_input_handle
+            .add_system_set(
+                ConditionSet::new()
                     .run_in_state(AppState::Running)
                     .label(SystemOrder::Input)
-                    .before(SystemOrder::Logic),
-            )
-            .add_system(
-                player_interact_handler
-                    .run_in_state(AppState::Running)
-                    .run_if(interact_cooldown)
-                    .label(SystemOrder::Logic)
-                    .after(SystemOrder::Input),
+                    .before(SystemOrder::Logic)
+                    .with_system(directional_input_handle)
+                    .with_system(player_harvest_action)
+                    .into()
             )
             .add_system(
                 update_sprite_position::<Player>
+                    .run_in_state(AppState::Running)
+                    .label(SystemOrder::Graphic)
+                    .after(SystemOrder::Logic),
+            )
+            .add_system(
+                move_target
                     .run_in_state(AppState::Running)
                     .label(SystemOrder::Graphic)
                     .after(SystemOrder::Logic),
@@ -67,6 +66,9 @@ impl Plugin for PlayerPlugin {
 pub struct Player;
 
 #[derive(Component)]
+struct PlayerTarget;
+
+#[derive(Component)]
 enum Direction {
     Up,
     Down,
@@ -75,16 +77,6 @@ enum Direction {
 }
 
 struct MoveEvent(Entity, TilePos);
-
-struct Interaction {
-    sender: Entity,
-    reciever: Entity,
-    reciever_pos: TilePos,
-}
-
-/// Timer used as an sleeper for held actions
-#[derive(Component)]
-struct InteractTimer(Timer);
 
 #[derive(Component)]
 struct HeldTimer(Timer);
@@ -102,11 +94,32 @@ fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking
         Player,
         Direction::Down,
         starting_pos,
-        InteractTimer(Timer::new(Duration::from_millis(PLAYER_INTERACT_TIMER_MS), TimerMode::Repeating)),
         HeldTimer(Timer::new(Duration::from_millis(PLAYER_MOVE_TIMER_MS), TimerMode::Repeating)),
     ));
 
     println!("Created player succesfully");
+
+    commands.spawn((
+        SpriteBundle {
+            texture: sprites.target.clone(),
+            transform: Transform::from_xyz(starting_pos.x as f32 * 8.0, starting_pos.y as f32 * 8.0 - 8.0, 50.0),
+            ..default() 
+        },
+        PlayerTarget
+    ));
+}
+
+fn move_target(player_q: Query<(&EntityTilePos, &Direction)>, mut target_q: Query<&mut Transform, With<PlayerTarget>>) {
+    if let Ok((player_tile_pos, dir)) = player_q.get_single() {
+        if let Ok(mut target) = target_q.get_single_mut() {
+            target.translation = match *dir {
+                Direction::Up => Vec3::new(player_tile_pos.x as f32 * 8.0, player_tile_pos.y as f32 * 8.0 + 8.0, 50.0),
+                Direction::Down => Vec3::new(player_tile_pos.x as f32 * 8.0, player_tile_pos.y as f32 * 8.0 - 8.0, 50.0),
+                Direction::Left => Vec3::new(player_tile_pos.x as f32 * 8.0 - 8.0, player_tile_pos.y as f32 * 8.0, 50.0),
+                Direction::Right => Vec3::new(player_tile_pos.x as f32 * 8.0 + 8.0, player_tile_pos.y as f32 * 8.0, 50.0),
+            };
+        }
+    };
 }
 
 /// Moves player entity from input
@@ -127,15 +140,9 @@ fn movement_cooldown(mut timer_q: Query<&mut HeldTimer, With<Player>>, time: Res
     let mut move_time = timer_q.single_mut();
     move_time.0.tick(time.delta());
     move_time.0.finished()
-    // if keeb.any_just_pressed([KeyCode::D, KeyCode::A, KeyCode::S, KeyCode::W]) {
+    // if keeb.any_just_released([KeyCode::D, KeyCode::A, KeyCode::S, KeyCode::W]) {
     //     move_time.0.tick(Duration::from_millis(PLAYER_MOVE_TIMER_MS));
     // }   // Too much power cannot slow down
-}
-
-fn interact_cooldown(mut timer_q: Query<&mut InteractTimer, With<Player>>, time: Res<Time>) -> bool {
-    let mut interact_time = timer_q.single_mut();
-    interact_time.0.tick(time.delta());
-    interact_time.0.finished()
 }
 
 /// Updates the sprite position based on a discrete position in the entity
@@ -150,12 +157,9 @@ fn update_sprite_position<Type: Component>(mut entity_q: Query<(&mut Transform, 
 /// Checks to ensure dest tile is inbounds of the map
 fn directional_input_handle(
     mut player_q: Query<(Entity, &EntityTilePos, &mut Direction), With<Player>>,
-    blocking_q: Query<&TilePos, With<Blocking>>,
-    blocking_interact_q: Query<(Entity, &TilePos), (With<Interact>, With<Blocking>)>,
-    obj_tiles_q: Query<(Entity, &ObjectSize, &TilePos)>,
-    keeb: Res<Input<KeyCode>>,
+    obj_tiles_q: Query<(&TilePos, Option<&ObjectSize>, Option<&Blocking>)>,
     mut ev_moveplayer: EventWriter<MoveEvent>,
-    mut ev_interact: EventWriter<Interaction>,
+    keeb: Res<Input<KeyCode>>,
 ) {
     // find the dest_tile which is player_pos + direction pressed
     let (player_entity, player_tile_pos, mut direction) = player_q.single_mut();
@@ -190,74 +194,64 @@ fn directional_input_handle(
         y: dest_tile.y as u32,
     };
 
+
+    // if the objects 
+    for (_, size, blocking) in obj_tiles_q.iter().filter(|x| dest_tile.eq(x.0)) {
+        if let Some(_) = size {
+            return;
+        } else if let Some(_) = blocking {
+            return;
+        }
+    }
+    ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
+}
+
+fn player_harvest_action(
+    player_q: Query<(Entity, &EntityTilePos, &Direction), With<Player>>,
+    blocking_interact_q: Query<(Entity, &TilePos), (With<Interact>, With<Blocking>)>,
+    obj_tiles_q: Query<(Entity, &ObjectSize, &TilePos)>,
+    mut ev_interact: EventWriter<HarvestInteraction>,
+    keeb: Res<Input<KeyCode>>, 
+) {
+    if !keeb.just_pressed(KeyCode::Space) {
+        return;
+    }
+
+    let (player_entity, pos, dir) = match player_q.get_single() {
+        Ok(e) => e,
+        Err(_) => {panic!("found more than one player in harvest fn")}
+    };
+
+    let dest_tile = match *dir {
+        Direction::Up => {TilePos{x: pos.x, y: pos.y + 1}},
+        Direction::Down => {TilePos{x: pos.x, y: pos.y - 1}},
+        Direction::Left => {TilePos{x: pos.x - 1, y: pos.y }},
+        Direction::Right => {TilePos{x: pos.x + 1, y: pos.y }},
+    };
+
     // check if the tile is an interactable
     //   is the dest_tile part of a multi tile -> get owner entity
     //   is the owner entity in the interactable query -> get entity with components
     //   give entity to the interact system
     if let Some((dest_entity, size, _)) = obj_tiles_q.iter().find(|x| dest_tile.eq(x.2)) {
+        println!("hit something");
         match *size {
             ObjectSize::Single => {
-                ev_interact.send(Interaction {
-                    sender: player_entity,
-                    reciever: dest_entity,
+                ev_interact.send(HarvestInteraction {
+                    harvester: player_entity,
+                    harvested: dest_entity,
                     reciever_pos: dest_tile,
                 });
             }
             ObjectSize::Multi(owner) => {
                 if let Ok(_) = blocking_interact_q.get(owner) {
-                    ev_interact.send(Interaction {
-                        sender: player_entity,
-                        reciever: owner,
+                    ev_interact.send(HarvestInteraction {
+                        harvester: player_entity,
+                        harvested: owner,
                         reciever_pos: dest_tile,
                     });
                 };
             }
-        }
-    } else if let Some(_) = blocking_q.iter().find(|elem| dest_tile.eq(elem)) {
-        return;
-    } else {
-        ev_moveplayer.send(MoveEvent(player_entity, dest_tile));
-    }
-
-    // if let Some((interactable_entity, _)) = blocking_interact_q.iter().find(|(_, elem)| dest_tile.eq(elem)) {
-    //     ev_interact.send(Interaction { sender: player_entity, reciever: interactable_entity });
-    // }
-}
-
-fn player_interact_handler(
-    mut player_q: Query<Entity, (With<EntityTilePos>, With<Player>)>,
-    mut interactables_q: Query<(&mut Interact, Entity, &TilePos)>,
-    mut ev_interact: EventReader<Interaction>,
-    mut ev_killed: EventWriter<HealthBelowZeroEvent>,
-    mut ev_spawnitem: EventWriter<SpawnItemEvent>,
-) {
-    for ev in ev_interact.iter() {
-        //TODO: remove this if not necessary
-        let _ = match player_q.get_mut(ev.sender) {
-            Ok(player_entity) => player_entity,
-            Err(_) => return,
-        };
-
-        let mut interact = match interactables_q.get_mut(ev.reciever) {
-            Ok(interact) => interact,
-            Err(_) => return,
-        };
-        match &mut *interact.0 {
-            // TODO: this should be moved into their own interact fns
-            Interact::Harvest(health) => {
-                if health.hp <= 0 {
-                    return;
-                }
-                health.hp -= 2;
-                println!("struck tree with fist hp: {}", health.hp);
-                if health.hp <= 0 {
-                    ev_killed.send(HealthBelowZeroEvent(interact.1, *interact.2));
-                    ev_spawnitem.send(SpawnItemEvent::from(ev.reciever_pos.x, ev.reciever_pos.y, 1));
-                    println!("tree is dead");
-                }
-            }
-            Interact::Pickup() => {}
-            Interact::Consume() => {}
         }
     }
 }
