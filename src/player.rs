@@ -69,14 +69,12 @@ pub struct Player;
 struct PlayerTarget;
 
 #[derive(Component)]
-enum Direction {
+pub enum Direction {
     Up,
     Down,
     Left,
     Right,
 }
-
-struct MoveEvent(Entity, TilePos);
 
 #[derive(Component)]
 struct HeldTimer(Timer);
@@ -123,6 +121,8 @@ fn move_target(player_q: Query<(&EntityTilePos, &Direction)>, mut target_q: Quer
         }
     };
 }
+
+struct MoveEvent(Entity, TilePos);
 
 /// Moves player entity from input
 fn move_player(mut player_q: Query<&mut EntityTilePos>, mut ev_move: EventReader<MoveEvent>) {

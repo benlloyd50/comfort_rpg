@@ -38,11 +38,11 @@ pub struct ItemDatabase {
 }
 
 // Static information about the item that is the same across all of its kind
-#[derive(Deserialize, Debug, Component)]
+#[derive(Deserialize, Debug, Component, Clone)]
 pub struct Item {
-    id: u32,          // unique identifier for the item
-    name: String,     // name of item
-    atlas_index: u32, // sprite index for the atlas
+    pub id: u32,          // unique identifier for the item
+    pub name: String,     // name of item
+    pub atlas_index: u32, // sprite index for the atlas
 }
 
 #[derive(Component)]
@@ -63,7 +63,7 @@ fn init_item_database(mut commands: Commands) {
     commands.insert_resource(ItemDatabase { items: item_db });
 }
 
-// Attempts to load items from a json file
+/// Attempts to load item definitions from a json file
 fn load_items_from_json() -> Result<Vec<Item>, Box<dyn Error>> {
     let contents = fs::read_to_string("assets/items/comfort_items.json")?;
     let items: Vec<Item> = serde_json::from_str(&contents)?;
@@ -93,12 +93,13 @@ fn spawn_item_at_xy(
             let tile_pos = TilePos { x: ev.x, y: ev.y };
             if let Some(item) = item_db.items.get(&ev.item_id) {
                 let item_entity = commands
-                    .spawn(TileBundle {
+                    .spawn((TileBundle {
                         position: tile_pos,
                         texture_index: TileTextureIndex(item.atlas_index),
                         tilemap_id: TilemapId(tiles_entity),
                         ..default()
-                    })
+                    }, Item::from(item.clone())
+                    ))
                     .id();
                 item_tiles.set(&tile_pos, item_entity);
             }
