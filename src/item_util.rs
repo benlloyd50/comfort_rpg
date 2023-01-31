@@ -34,19 +34,22 @@ impl Plugin for ItemUtilPlugin {
 // Maps all items to a unique u32, loaded on startup and should not be mutated at runtime
 #[derive(Resource)]
 pub struct ItemDatabase {
-    items: HashMap<u32, Item>,
+    items: HashMap<ItemId, Item>,
 }
 
 // Static information about the item that is the same across all of its kind
 #[derive(Deserialize, Debug, Component, Clone)]
 pub struct Item {
-    pub id: u32,          // unique identifier for the item
+    pub id: ItemId,       // unique identifier for the item
     pub name: String,     // name of item
     pub atlas_index: u32, // sprite index for the atlas
 }
 
-#[derive(Component)]
-pub struct ItemQuantity(u32);
+#[derive(Component, Copy, Clone, Debug)]
+pub struct ItemQuantity(pub u32);
+
+#[derive(Deserialize, Debug, Copy, Clone, Hash, Eq, PartialEq)]
+pub struct ItemId(pub u32);
 
 fn init_item_database(mut commands: Commands) {
     let items = match load_items_from_json() {
@@ -73,11 +76,11 @@ fn load_items_from_json() -> Result<Vec<Item>, Box<dyn Error>> {
 pub struct SpawnItemEvent {
     x: u32,
     y: u32,
-    item_id: u32,
+    item_id: ItemId,
 }
 
 impl SpawnItemEvent {
-    pub fn from(x: u32, y: u32, item_id: u32) -> SpawnItemEvent {
+    pub fn from(x: u32, y: u32, item_id: ItemId) -> SpawnItemEvent {
         SpawnItemEvent { x, y, item_id }
     }
 }
@@ -93,12 +96,15 @@ fn spawn_item_at_xy(
             let tile_pos = TilePos { x: ev.x, y: ev.y };
             if let Some(item) = item_db.items.get(&ev.item_id) {
                 let item_entity = commands
-                    .spawn((TileBundle {
-                        position: tile_pos,
-                        texture_index: TileTextureIndex(item.atlas_index),
-                        tilemap_id: TilemapId(tiles_entity),
-                        ..default()
-                    }, Item::from(item.clone())
+                    .spawn((
+                        TileBundle {
+                            position: tile_pos,
+                            texture_index: TileTextureIndex(item.atlas_index),
+                            tilemap_id: TilemapId(tiles_entity),
+                            ..default()
+                        },
+                        item.clone(),
+                        ItemQuantity(1),
                     ))
                     .id();
                 item_tiles.set(&tile_pos, item_entity);

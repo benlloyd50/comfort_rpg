@@ -189,7 +189,8 @@ impl GameWorld {
                 let mut perlin_value = noise.get_noise((x as f32) / 160.0, (y as f32) / 100.0);
                 perlin_value = (perlin_value + 1.0) * 0.5;
 
-                if !(0.2f32..=0.6f32).contains(&perlin_value) {          //spawn object
+                if !(0.2f32..=0.6f32).contains(&perlin_value) {
+                    //spawn object
                     let (base_entity, top_entity) = place_medium_tree(commands, &self.objs_tilemap, &tree_base_pos);
                     self.objs_tiles.set(&tree_base_pos, base_entity);
                     self.objs_tiles.set(&tree_top_pos, top_entity);

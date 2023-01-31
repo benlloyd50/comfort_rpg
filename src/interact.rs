@@ -3,7 +3,7 @@ use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    item_util::SpawnItemEvent,
+    item_util::{ItemId, SpawnItemEvent},
     player::SystemOrder,
     world_gen::{Blocking, ObjectSize},
     AppState,
@@ -82,8 +82,8 @@ fn cleanup_world_objs(
 }
 
 pub struct HarvestInteraction {
-    pub harvester: Entity,       
-    pub harvested: Entity,     
+    pub harvester: Entity,
+    pub harvested: Entity,
     pub reciever_pos: TilePos,
 }
 
@@ -102,7 +102,7 @@ fn harvest_interact_handler(
             println!("struck obj with fist hp: {}", health.hp);
             if health.hp <= 0 {
                 ev_destroyed.send(HealthBelowZeroEvent(interactable, *pos));
-                ev_spawnitem.send(SpawnItemEvent::from(ev.reciever_pos.x, ev.reciever_pos.y, 1));
+                ev_spawnitem.send(SpawnItemEvent::from(ev.reciever_pos.x, ev.reciever_pos.y, ItemId(1)));
                 println!("obj is dead");
             }
         }

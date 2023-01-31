@@ -8,7 +8,8 @@ use crate::{
     assets::SpriteAssets,
     effects::lerp,
     entity_tile_pos::EntityTilePos,
-    interact::{Interact, HarvestInteraction},
+    interact::{HarvestInteraction, Interact},
+    inventory::Inventory,
     world_gen::{within_bounds, Blocking, ObjectSize},
     AppState,
 };
@@ -45,7 +46,7 @@ impl Plugin for PlayerPlugin {
                     .before(SystemOrder::Logic)
                     .with_system(directional_input_handle)
                     .with_system(player_harvest_action)
-                    .into()
+                    .into(),
             )
             .add_system(
                 update_sprite_position::<Player>
@@ -93,6 +94,7 @@ fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking
         Direction::Down,
         starting_pos,
         HeldTimer(Timer::new(Duration::from_millis(PLAYER_MOVE_TIMER_MS), TimerMode::Repeating)),
+        Inventory::new(),
     ));
 
     println!("Created player succesfully");
@@ -101,9 +103,9 @@ fn setup_character(mut commands: Commands, sprites: Res<SpriteAssets>, _blocking
         SpriteBundle {
             texture: sprites.target.clone(),
             transform: Transform::from_xyz(starting_pos.x as f32 * 8.0, starting_pos.y as f32 * 8.0 - 8.0, 50.0),
-            ..default() 
+            ..default()
         },
-        PlayerTarget
+        PlayerTarget,
     ));
 }
 
@@ -114,9 +116,15 @@ fn move_target(player_q: Query<(&EntityTilePos, &Direction)>, mut target_q: Quer
         if let Ok(mut target) = target_q.get_single_mut() {
             target.translation = match *dir {
                 Direction::Up => Vec3::new(player_tile_pos.x as f32 * 8.0, player_tile_pos.y as f32 * 8.0 + 8.0, 50.0),
-                Direction::Down => Vec3::new(player_tile_pos.x as f32 * 8.0, player_tile_pos.y as f32 * 8.0 - 8.0, 50.0),
-                Direction::Left => Vec3::new(player_tile_pos.x as f32 * 8.0 - 8.0, player_tile_pos.y as f32 * 8.0, 50.0),
-                Direction::Right => Vec3::new(player_tile_pos.x as f32 * 8.0 + 8.0, player_tile_pos.y as f32 * 8.0, 50.0),
+                Direction::Down => {
+                    Vec3::new(player_tile_pos.x as f32 * 8.0, player_tile_pos.y as f32 * 8.0 - 8.0, 50.0)
+                }
+                Direction::Left => {
+                    Vec3::new(player_tile_pos.x as f32 * 8.0 - 8.0, player_tile_pos.y as f32 * 8.0, 50.0)
+                }
+                Direction::Right => {
+                    Vec3::new(player_tile_pos.x as f32 * 8.0 + 8.0, player_tile_pos.y as f32 * 8.0, 50.0)
+                }
             };
         }
     };
@@ -127,10 +135,10 @@ struct MoveEvent(Entity, TilePos);
 /// Moves player entity from input
 fn move_player(mut player_q: Query<&mut EntityTilePos>, mut ev_move: EventReader<MoveEvent>) {
     for ev in ev_move.iter() {
-    if let Ok(mut player_tile_pos) = player_q.get_mut(ev.0) {
-             player_tile_pos.x = ev.1.x;
-             player_tile_pos.y = ev.1.y;
-         };
+        if let Ok(mut player_tile_pos) = player_q.get_mut(ev.0) {
+            player_tile_pos.x = ev.1.x;
+            player_tile_pos.y = ev.1.y;
+        };
     }
 }
 
@@ -190,8 +198,7 @@ fn directional_input_handle(
         y: dest_tile.y as u32,
     };
 
-
-    // if the objects 
+    // if the objects
     for (_, size, blocking) in obj_tiles_q.iter().filter(|x| dest_tile.eq(x.0)) {
         if size.is_some() || blocking.is_some() {
             return;
@@ -205,7 +212,7 @@ fn player_harvest_action(
     blocking_interact_q: Query<(Entity, &TilePos), (With<Interact>, With<Blocking>)>,
     obj_tiles_q: Query<(Entity, &ObjectSize, &TilePos)>,
     mut ev_interact: EventWriter<HarvestInteraction>,
-    keeb: Res<Input<KeyCode>>, 
+    keeb: Res<Input<KeyCode>>,
 ) {
     if !keeb.just_pressed(KeyCode::Space) {
         return;
@@ -213,14 +220,16 @@ fn player_harvest_action(
 
     let (player_entity, pos, dir) = match player_q.get_single() {
         Ok(e) => e,
-        Err(_) => {panic!("found more than one player in harvest fn")}
+        Err(_) => {
+            panic!("found more than one player in harvest fn")
+        }
     };
 
     let dest_tile = match *dir {
-        Direction::Up => {TilePos{x: pos.x, y: pos.y + 1}},
-        Direction::Down => {TilePos{x: pos.x, y: pos.y - 1}},
-        Direction::Left => {TilePos{x: pos.x - 1, y: pos.y }},
-        Direction::Right => {TilePos{x: pos.x + 1, y: pos.y }},
+        Direction::Up => TilePos { x: pos.x, y: pos.y + 1 },
+        Direction::Down => TilePos { x: pos.x, y: pos.y - 1 },
+        Direction::Left => TilePos { x: pos.x - 1, y: pos.y },
+        Direction::Right => TilePos { x: pos.x + 1, y: pos.y },
     };
 
     // check if the tile is an interactable
