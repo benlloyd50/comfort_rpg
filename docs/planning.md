@@ -34,4 +34,4 @@
 - Fishing
 - Mining ideas, multi block hit so you can hit multiple blocks
 - Certain terrain could require upgraded materials
-
+- Ascii Graphics *Toggable*
