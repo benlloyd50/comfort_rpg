@@ -23,6 +23,7 @@ pub const TILE_PIXELS_X: f32 = 8f32;
 pub const TILE_PIXELS_Y: f32 = 8f32;
 pub const FLOOR_Z: f32 = 0f32; // Generally the lowest depth in terms of sprites
 pub const OBJECT_Z: f32 = 10f32; // Height for objects such as trees or rocks to exist in the world
+pub const ITEM_Z: f32 = 5f32; // Height for items
 
 pub struct WorldGenerationPlugin;
 
@@ -98,8 +99,11 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
             ..Default::default()
         },
         ObjectStorage,
-        Blocking,
+        // Blocking,
     ));
+    
+    create_item_tilestorage(commands, tiles);
+
     let duration = start.elapsed();
     println!("World created succesfully in {:?}", duration);
 }
@@ -114,6 +118,7 @@ fn regenerate_world(
         return;
     }
 
+    let mut i: i32 = 1;
     for (mut tile_storage, tilemap_entity) in tile_storage_q.iter_mut() {
         // Despawn existing world
         for x in 0..MAP_SIZE_X {
@@ -126,6 +131,8 @@ fn regenerate_world(
             }
         }
         commands.entity(tilemap_entity).despawn_recursive();
+        println!("Despawned storage {i}");
+        i += 1;
     }
 
     // Create world
@@ -259,6 +266,26 @@ fn place_medium_tree(commands: &mut Commands, blocked_tilemap: &Entity, tree_bas
     ));
 
     (base_entity, top_entity)
+}
+
+// Creates entity to hold all item entities when they exist in the overworld
+fn create_item_tilestorage(mut commands: Commands, tiles: Res<SpriteAssets>) {
+    let item_tilemap = commands.spawn_empty().id();
+    let tilemap_size = world_size();
+    let item_tiles = TileStorage::empty(tilemap_size);
+    commands.entity(item_tilemap).insert((
+        TilemapBundle {
+            grid_size: tilegridsize_pixels(),
+            map_type: TilemapType::Square,
+            size: tilemap_size,
+            storage: item_tiles,
+            texture: TilemapTexture::Single(tiles.items.clone()),
+            tile_size: tilemaptilesize_pixels(),
+            transform: Transform::from_translation(Vec3::new(0f32, 0f32, ITEM_Z)),
+            ..Default::default()
+        },
+        ItemStorage,
+    ));
 }
 
 fn stretch_tree(mut tree_q: Query<(&mut Transform, &TilePos), With<Tree>>, keeb: Res<Input<KeyCode>>) {

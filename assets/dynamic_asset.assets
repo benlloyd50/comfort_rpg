@@ -8,15 +8,11 @@
     "items": File (
         path: "images/items.png",
     ),
-    "characters": TextureAtlas (
-        path: "images/characters.png",
-        tile_size_x: 8.,
-        tile_size_y: 8.,
-        columns: 8,
-        rows: 1,
-    ),
     "plants": File (
         path: "images/plants.png",
+    ),
+    "target": File (
+        path: "images/target_outline.png",
     ),
     "tree": TextureAtlas (
         path: "images/tree1.png",
@@ -25,7 +21,17 @@
         columns: 1,
         rows: 1,
     ),
-    "target": File (
-        path: "images/target_outline.png",
+    "characters": TextureAtlas (
+        path: "images/characters.png",
+        tile_size_x: 8.,
+        tile_size_y: 8.,
+        columns: 8,
+        rows: 1,
     ),
+    "chunkfive": File (
+        path: "font/Minimal5x7.ttf"
+    ),
+    "menubg": File (
+        path: "images/menu.png"
+    )
 })

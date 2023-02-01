@@ -7,14 +7,11 @@ use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    assets::SpriteAssets,
-    world_gen::{tilegridsize_pixels, tilemaptilesize_pixels, world_size, ItemStorage},
+    world_gen::ItemStorage,
     AppState,
 };
 use serde::Deserialize;
 use std::{error::Error, fs};
-
-pub const ITEM_Z: f32 = 5f32; // Height for items
 
 pub struct ItemUtilPlugin;
 
@@ -22,7 +19,6 @@ impl Plugin for ItemUtilPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SpawnItemEvent>()
             .add_enter_system(AppState::GameLoading, init_item_database)
-            .add_enter_system(AppState::GameLoading, create_item_tilestorage)
             .add_system(
                 spawn_item_at_xy
                     .run_in_state(AppState::Running)
@@ -34,7 +30,7 @@ impl Plugin for ItemUtilPlugin {
 // Maps all items to a unique u32, loaded on startup and should not be mutated at runtime
 #[derive(Resource)]
 pub struct ItemDatabase {
-    items: HashMap<ItemId, Item>,
+    pub items: HashMap<ItemId, Item>,
 }
 
 // Static information about the item that is the same across all of its kind
@@ -113,22 +109,3 @@ fn spawn_item_at_xy(
     }
 }
 
-// Creates entity to hold all item entities when they exist in the overworld
-fn create_item_tilestorage(mut commands: Commands, tiles: Res<SpriteAssets>) {
-    let item_tilemap = commands.spawn_empty().id();
-    let tilemap_size = world_size();
-    let item_tiles = TileStorage::empty(tilemap_size);
-    commands.entity(item_tilemap).insert((
-        TilemapBundle {
-            grid_size: tilegridsize_pixels(),
-            map_type: TilemapType::Square,
-            size: tilemap_size,
-            storage: item_tiles,
-            texture: TilemapTexture::Single(tiles.items.clone()),
-            tile_size: tilemaptilesize_pixels(),
-            transform: Transform::from_translation(Vec3::new(0f32, 0f32, ITEM_Z)),
-            ..Default::default()
-        },
-        ItemStorage,
-    ));
-}

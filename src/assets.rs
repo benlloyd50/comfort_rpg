@@ -9,12 +9,24 @@ impl Plugin for AssetLoadPlugin {
         app.add_loading_state(
             LoadingState::new(AppState::AssetLoading)
                 .continue_to_state(AppState::GameLoading)
-                .with_dynamic_collections::<StandardDynamicAssetCollection>(vec![
-                    "dynamic_asset.assets",
-                ])
-                .with_collection::<SpriteAssets>(),
+                .with_dynamic_collections::<StandardDynamicAssetCollection>(vec!["dynamic_asset.assets"])
+                .with_collection::<SpriteAssets>()
+                .with_collection::<FontAssets>()
+                .with_collection::<UiAssets>(),
         );
     }
+}
+
+#[derive(AssetCollection, Resource)]
+pub struct FontAssets {
+    #[asset(key = "chunkfive")]
+    pub chunk: Handle<Font>,
+}
+
+#[derive(AssetCollection, Resource)]
+pub struct UiAssets {
+    #[asset(key = "menubg")]
+    pub menubg: Handle<Image>,
 }
 
 #[derive(AssetCollection, Resource)]
