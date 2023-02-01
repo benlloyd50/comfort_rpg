@@ -25,7 +25,7 @@
 ## Prototype
 - [X] Generate World
 - [X] Move Player around world
-- [ ] Gather resources
+- [X] Gather resources
 - [ ] Craft resources into materials then into deployables
 - [ ] Build with the deployables
 
