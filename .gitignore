@@ -3,5 +3,6 @@
 *.aseprite
 
 assets/sound/
+assets/font/chunkfive.otf
 
 .rustfmt.toml

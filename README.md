@@ -3,8 +3,9 @@
 
 # Features
 - Procedural world
-- Resource gathering, crafting, processing
-- Character selection
+- Resource gathering
+- Crafting
+- Building
 
 # Plans
 [Read me for plans and goals](docs/planning.md)
