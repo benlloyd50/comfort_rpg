@@ -1,0 +1,31 @@
+({
+    "terrain": File (
+        path: "images/terrain.png",
+    ),
+    "world_objs": File (
+        path: "images/world_objs.png",
+    ),
+    "items": File (
+        path: "images/items.png",
+    ),
+    "characters": TextureAtlas (
+        path: "images/characters.png",
+        tile_size_x: 8.,
+        tile_size_y: 8.,
+        columns: 8,
+        rows: 1,
+    ),
+    "plants": File (
+        path: "images/plants.png",
+    ),
+    "tree": TextureAtlas (
+        path: "images/tree1.png",
+        tile_size_x: 8.,
+        tile_size_y: 16.,
+        columns: 1,
+        rows: 1,
+    ),
+    "target": File (
+        path: "images/target_outline.png",
+    ),
+})

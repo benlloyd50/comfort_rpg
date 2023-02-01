@@ -261,7 +261,9 @@ dependencies = [
  "anyhow",
  "bevy",
  "bevy_asset_loader_derive",
+ "bevy_common_assets",
  "iyes_loopless",
+ "serde",
 ]
 
 [[package]]
@@ -289,6 +291,18 @@ dependencies = [
  "bevy_utils",
  "parking_lot",
  "rodio",
+]
+
+[[package]]
+name = "bevy_common_assets"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f6b7df078908d118a55440470962f4393ac6a4ce89b13a3cd5bff49d4a06f29"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "ron 0.7.1",
+ "serde",
 ]
 
 [[package]]
@@ -691,7 +705,7 @@ dependencies = [
  "bevy_render",
  "bevy_transform",
  "bevy_utils",
- "ron",
+ "ron 0.8.0",
  "serde",
  "thiserror",
  "uuid",
@@ -2571,6 +2585,17 @@ checksum = "eb10b653d5ec0e9411a2e7d46e2c7f4046fd87d35b9955bd73ba4108d69072b5"
 dependencies = [
  "cpal",
  "lewton",
+]
+
+[[package]]
+name = "ron"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88073939a61e5b7680558e6be56b419e208420c2adb92be54921fa6b72283f1a"
+dependencies = [
+ "base64",
+ "bitflags",
+ "serde",
 ]
 
 [[package]]

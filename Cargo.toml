@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.9"
-bevy_asset_loader = { version = "0.14", features = ["2d", "stageless"]}
+bevy_asset_loader = { version = "0.14", features = ["2d", "stageless", "standard_dynamic_assets"]}
 bevy_ecs_tilemap = { version = "0.9", features = ["atlas"] }
 iyes_loopless = "0.9.1"
 rand = "0.8.5"

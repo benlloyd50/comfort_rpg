@@ -9,6 +9,9 @@ impl Plugin for AssetLoadPlugin {
         app.add_loading_state(
             LoadingState::new(AppState::AssetLoading)
                 .continue_to_state(AppState::GameLoading)
+                .with_dynamic_collections::<StandardDynamicAssetCollection>(vec![
+                    "dynamic_asset.assets",
+                ])
                 .with_collection::<SpriteAssets>(),
         );
     }
@@ -16,27 +19,24 @@ impl Plugin for AssetLoadPlugin {
 
 #[derive(AssetCollection, Resource)]
 pub struct SpriteAssets {
-    #[asset(path = "terrain.png")]
+    #[asset(key = "terrain")]
     pub terrain: Handle<Image>,
 
-    #[asset(path = "world_objs.png")]
+    #[asset(key = "world_objs")]
     pub world_objs: Handle<Image>,
 
-    // TODO: consider joining with world_objs
-    #[asset(path = "items.png")]
+    #[asset(key = "items")]
     pub items: Handle<Image>,
 
-    #[asset(texture_atlas(tile_size_x = 8., tile_size_y = 8., columns = 8, rows = 1))]
-    #[asset(path = "characters.png")]
+    #[asset(key = "characters")]
     pub characters: Handle<TextureAtlas>,
 
-    #[asset(path = "plants.png")]
+    #[asset(key = "plants")]
     pub plants: Handle<Image>,
 
-    #[asset(texture_atlas(tile_size_x = 8., tile_size_y = 16., columns = 1, rows = 1))]
-    #[asset(path = "tree1.png")]
+    #[asset(key = "tree")]
     pub tree: Handle<TextureAtlas>,
 
-    #[asset(path = "target_outline.png")]
+    #[asset(key = "target")]
     pub target: Handle<Image>,
 }
