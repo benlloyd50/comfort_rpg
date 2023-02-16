@@ -1,0 +1,13 @@
+[
+    {
+        "id": 1,
+        "ingredients": [
+            {
+                "item_id": 1,
+                "item_quantity": 1
+            }
+        ],
+        "output_id": 6,
+        "output_amt": 1
+    }
+]

@@ -11,6 +11,7 @@
 [Read me for plans and goals](docs/planning.md)
 
 # Screenshots
+![World with an Island](screenshots/island_trees.png)
 ![World Generation](screenshots/comfort_rpg_worldgen2.gif)
 ![In game forest](screenshots/forest1.png)
 ![In game flowers with player](screenshots/flowers1.png)

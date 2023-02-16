@@ -188,7 +188,7 @@ fn directional_input_handle(
     // if the dest_tile or input was 0 then we don't do anything else
     // make sure the position is not out of bounds of the map
     if dest_tile == Vec2::new(player_tile_pos.x as f32, player_tile_pos.y as f32)
-        || !within_bounds(Vec2::new(dest_tile.x as f32, dest_tile.y as f32))
+        || !within_bounds(Vec2::new(dest_tile.x, dest_tile.y))
     {
         return;
     }

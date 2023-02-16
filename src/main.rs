@@ -17,6 +17,8 @@ mod item_util;
 use item_util::ItemUtilPlugin;
 mod inventory;
 use inventory::InventoryPlugin;
+mod crafting;
+use crafting::CraftingPlugin;
 
 use bevy::prelude::*;
 use bevy::window::PresentMode;
@@ -42,6 +44,7 @@ fn main() {
         .add_plugin(InteractPlugin)
         .add_plugin(ItemUtilPlugin)
         .add_plugin(InventoryPlugin)
+        .add_plugin(CraftingPlugin)
         .add_system(run_game.run_in_state(AppState::GameLoading))
         .add_system(bevy::window::close_on_esc)
         .run();

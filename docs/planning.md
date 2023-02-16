@@ -29,6 +29,16 @@
 - [ ] Craft resources into materials then into deployables
 - [ ] Build with the deployables
 
+## Inventory
+- will probably need some more safety features like enforcing size when adding items
+
+## Crafting System
+- At it's root we are checking to see if a player has the items needed, removing them, and giving them a new one
+- Define recipes in a json similar to how items are defined
+  - Recipes will probably have an id, components, and amt given
+- Need some sort of menu, probably similar to the inventory menu
+  - Player will attempt to craft an item by navigating the menu and then some fn will run
+
 ## Ideas
 - A flowing ocean with animated tiles?
 - Fishing

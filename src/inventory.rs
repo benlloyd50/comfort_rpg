@@ -1,3 +1,4 @@
+use bevy::utils::hashbrown::hash_map::Entry;
 use bevy::{prelude::*, ui::widget::ImageMode, utils::HashMap};
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
@@ -5,7 +6,7 @@ use iyes_loopless::prelude::*;
 use crate::{
     assets::{FontAssets, UiAssets},
     entity_tile_pos::EntityTilePos,
-    item_util::{Item, ItemId, ItemQuantity, ItemDatabase},
+    item_util::{Item, ItemDatabase, ItemId, ItemQuantity},
     player::{Direction, Player, SystemOrder},
     world_gen::ItemStorage,
     AppState,
@@ -23,10 +24,14 @@ impl Plugin for InventoryPlugin {
                     .before(SystemOrder::Logic)
                     .with_system(take_item)
                     .with_system(toggle_inventory)
-                    .into()
+                    .into(),
             )
             .add_event::<InventoryUpdate>()
-            .add_system( ui_inventory_update.run_in_state(AppState::Running).run_on_event::<InventoryUpdate>());
+            .add_system(
+                ui_inventory_update
+                    .run_in_state(AppState::Running)
+                    .run_on_event::<InventoryUpdate>(),
+            );
     }
 }
 
@@ -47,19 +52,41 @@ impl Inventory {
 
     pub fn add_item(&mut self, id: ItemId, amt: &ItemQuantity) {
         match self.items.entry(id) {
-            bevy::utils::hashbrown::hash_map::Entry::Occupied(o) => {
+            Entry::Occupied(o) => {
                 o.into_mut().0 += amt.0;
             }
-            bevy::utils::hashbrown::hash_map::Entry::Vacant(v) => {
+            Entry::Vacant(v) => {
                 v.insert(*amt);
             }
         }
     }
-}
 
-/// Marks an item as being carried by the owner Entity
-#[derive(Component)]
-struct Carried(Entity);
+    // Attempts to remove items from an inventory
+    // Will fail if the quantity in the inventory is less than what is trying to be removed
+    pub fn remove_item(&mut self, id: ItemId, amt: &ItemQuantity) -> bool {
+        match self.items.entry(id) {
+            Entry::Occupied(mut o) => {
+                if o.get().0 >= amt.0 {
+                    o.get_mut().0 -= amt.0;
+                    if o.get().0 == 0 {
+                        o.remove_entry();
+                    }
+                    return true;
+                }
+                false
+            }
+            Entry::Vacant(_v) => false,
+        }
+    }
+
+    // Checks the inventory to see if there is the specified quantity and item inside
+    pub fn contains_item(&self, id: ItemId, amt: &ItemQuantity) -> bool {
+        match self.items.get(&id) {
+            Some(item) => item.0 >= amt.0,
+            None => false,
+        }
+    }
+}
 
 /// When the player presses the pickup key it will attempt to pickup the item under the player or
 /// in the direction they face, priority is given to underneath self
@@ -67,6 +94,7 @@ fn take_item(
     mut commands: Commands,
     mut player_q: Query<(&EntityTilePos, &Direction, &mut Inventory), With<Player>>,
     mut tilestorage_q: Query<&mut TileStorage, With<ItemStorage>>,
+    mut ev_invopen: EventWriter<InventoryUpdate>,
     items_q: Query<(Entity, &Item, &ItemQuantity), With<TilePos>>,
     keeb: Res<Input<KeyCode>>,
 ) {
@@ -91,7 +119,6 @@ fn take_item(
             tile_storage.remove(&dest_tile);
             commands.entity(entity).despawn_recursive();
             inventory.add_item(item_info.id, qty);
-            println!("Picked up {}", item_info.name);
         }
     }
 
@@ -107,7 +134,7 @@ fn take_item(
             tile_storage.remove(&dest_tile);
             commands.entity(entity).despawn_recursive();
             inventory.add_item(item_info.id, qty);
-            println!("Picked up {}", item_info.name);
+            ev_invopen.send(InventoryUpdate);
         }
     }
 }
@@ -118,11 +145,10 @@ struct InventoryUi;
 #[derive(Component)]
 struct InventorySlot(u32);
 
-#[allow(dead_code)]
 fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: Res<UiAssets>) {
     let text_style = TextStyle {
         font: font.chunk.clone(),
-        font_size: 32.0,
+        font_size: 24.0,
         color: Color::BLACK,
     };
 
@@ -134,10 +160,13 @@ fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: 
     };
 
     commands
-        .spawn((NodeBundle {
-            transform: Transform::from_xyz(0., 0., 80.),
-            ..default()
-        }, InventoryUi))
+        .spawn((
+            NodeBundle {
+                transform: Transform::from_xyz(0., 0., 80.),
+                ..default()
+            },
+            InventoryUi,
+        ))
         .with_children(|parent| {
             // the window which objects for the inventory ui will sit on
             parent
@@ -151,12 +180,11 @@ fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: 
                     for i in 0..15 {
                         let offset: f32 = i as f32 * 26.0;
                         parent.spawn((
-                            TextBundle::from_section(format!("{: <20} {:>3}", "======", "000"), text_style.clone())
-                            .with_style(Style {
+                            TextBundle::from_section("", text_style.clone()).with_style(Style {
                                 align_self: AlignSelf::Center,
                                 position_type: PositionType::Absolute,
                                 position: UiRect {
-                                    left: Val::Px(40.),
+                                    left: Val::Px(50.),
                                     top: Val::Px(32. + offset),
                                     ..default()
                                 },
@@ -185,7 +213,7 @@ fn ui_inventory_update(
 
         let mut filled_in: usize = 0;
         for (mut text, (item_id, qty)) in ui_slots_q.iter_mut().zip(player_inv.items.iter()) {
-            if let Some(info) = item_db.items.get(&item_id) {
+            if let Some(info) = item_db.items.get(item_id) {
                 text.sections[0].value = format!("{: <20}AMT:{:>3}", info.name, qty.0);
             } else {
                 text.sections[0].value = format!("{: <20}AMT:{:>3}", "undefined", "XXX");
@@ -198,8 +226,11 @@ fn ui_inventory_update(
     }
 }
 
-fn toggle_inventory(mut inventory_ui_q: Query<&mut Visibility, With<InventoryUi>>, keeb: Res<Input<KeyCode>>
-                    , mut ev_invopen: EventWriter<InventoryUpdate>) {
+fn toggle_inventory(
+    mut inventory_ui_q: Query<&mut Visibility, With<InventoryUi>>,
+    keeb: Res<Input<KeyCode>>,
+    mut ev_invopen: EventWriter<InventoryUpdate>,
+) {
     if !keeb.just_pressed(KeyCode::I) {
         return;
     }
@@ -210,5 +241,4 @@ fn toggle_inventory(mut inventory_ui_q: Query<&mut Visibility, With<InventoryUi>
             ev_invopen.send(InventoryUpdate);
         }
     }
-
 }

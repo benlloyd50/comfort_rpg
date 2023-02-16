@@ -6,10 +6,7 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
-use crate::{
-    world_gen::ItemStorage,
-    AppState,
-};
+use crate::{world_gen::ItemStorage, AppState};
 use serde::Deserialize;
 use std::{error::Error, fs};
 
@@ -41,7 +38,10 @@ pub struct Item {
     pub atlas_index: u32, // sprite index for the atlas
 }
 
-#[derive(Component, Copy, Clone, Debug)]
+// Note: ItemId and ItemQuantity are often used together why not join them
+// Note2: so ItemId is the key and if they were combined the key and value pair would share the
+// same info not sure?
+#[derive(Deserialize, Component, Copy, Clone, Debug)]
 pub struct ItemQuantity(pub u32);
 
 #[derive(Deserialize, Debug, Copy, Clone, Hash, Eq, PartialEq)]
@@ -55,7 +55,6 @@ fn init_item_database(mut commands: Commands) {
 
     let mut item_db = HashMap::new();
     for item in items {
-        // println!("{:#?}", item);
         item_db.insert(item.id, item);
     }
 
@@ -108,4 +107,3 @@ fn spawn_item_at_xy(
         }
     }
 }
-
