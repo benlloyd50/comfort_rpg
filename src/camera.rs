@@ -11,15 +11,16 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(GameState::GameLoading, load_camera).add_system_set(
-            ConditionSet::new()
-                .run_in_state(GameState::Running)
-                .label("graphicDelay")
-                .after(SystemOrder::Graphic)
-                .with_system(zoom_camera)
-                .with_system(camera_follow_player)
-                .into(),
-        );
+        app.add_enter_system(GameState::GameLoading, load_camera)
+            .add_system_set(
+                ConditionSet::new()
+                    .run_in_state(GameState::Running)
+                    .label("graphicDelay")
+                    .after(SystemOrder::Graphic)
+                    .with_system(zoom_camera)
+                    .with_system(camera_follow_player)
+                    .into(),
+            );
     }
 }
 

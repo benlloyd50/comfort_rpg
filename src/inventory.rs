@@ -1,5 +1,4 @@
-use bevy::utils::hashbrown::hash_map::Entry;
-use bevy::{prelude::*, ui::widget::ImageMode, utils::HashMap};
+use bevy::{prelude::*, ui::widget::ImageMode};
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
@@ -31,6 +30,13 @@ impl Plugin for InventoryPlugin {
                 ui_inventory_update
                     .run_in_state(GameState::Running)
                     .run_on_event::<InventoryUpdate>(),
+            )
+            .add_system_set(
+                ConditionSet::new()
+                    .run_in_state(GameState::Menu)
+                    .with_system(toggle_inventory)
+                    .with_system(move_inventory_cursor)
+                    .into(),
             );
     }
 }
@@ -42,21 +48,30 @@ struct InventoryCapacity(u32);
 // u32 is the id of the item
 #[derive(Component)]
 pub struct Inventory {
-    items: HashMap<ItemId, ItemQuantity>,
+    items: Vec<InventoryItem>,
+    // items: HashMap<ItemId, ItemQuantity>,
+    max_size: usize,
+}
+
+struct InventoryItem {
+    id: u32,
+    amt: u32,
 }
 
 impl Inventory {
     pub fn new() -> Self {
-        Inventory { items: HashMap::new() }
+        Inventory {
+            // items: HashMap::new(),
+            items: Vec::new(),
+            max_size: 15,
+        }
     }
 
     pub fn add_item(&mut self, id: ItemId, amt: &ItemQuantity) {
-        match self.items.entry(id) {
-            Entry::Occupied(o) => {
-                o.into_mut().0 += amt.0;
-            }
-            Entry::Vacant(v) => {
-                v.insert(*amt);
+        match self.items.iter().position(|i| i.id == id.0) {
+            Some(idx) => { self.items[idx].amt += amt.0;},
+            None => if self.items.len() < self.max_size {
+                self.items.push(InventoryItem { id: id.0, amt: amt.0});
             }
         }
     }
@@ -64,25 +79,40 @@ impl Inventory {
     // Attempts to remove items from an inventory
     // Will fail if the quantity in the inventory is less than what is trying to be removed
     pub fn remove_item(&mut self, id: ItemId, amt: &ItemQuantity) -> bool {
-        match self.items.entry(id) {
-            Entry::Occupied(mut o) => {
-                if o.get().0 >= amt.0 {
-                    o.get_mut().0 -= amt.0;
-                    if o.get().0 == 0 {
-                        o.remove_entry();
+        match self.items.iter().position(|i| i.id == id.0) {
+            Some(idx) => { 
+                if self.items[idx].amt >= amt.0 {
+                    self.items[idx].amt -= amt.0;
+                    if self.items[idx].amt == 0 {
+                        self.items.remove(idx);
                     }
                     return true;
-                }
-                false
-            }
-            Entry::Vacant(_v) => false,
+                }   
+                return false; 
+            },
+            None => false
         }
+
+
+        // match self.items.entry(id) {
+        //     Entry::Occupied(mut o) => {
+        //         if o.get().0 >= amt.0 {
+        //             o.get_mut().0 -= amt.0;
+        //             if o.get().0 == 0 {
+        //                 o.remove_entry();
+        //             }
+        //             return true;
+        //         }
+        //         false
+        //     }
+        //     Entry::Vacant(_v) => false,
+        // }
     }
 
     // Checks the inventory to see if there is the specified quantity and item inside
     pub fn contains_item(&self, id: ItemId, amt: &ItemQuantity) -> bool {
-        match self.items.get(&id) {
-            Some(item) => item.0 >= amt.0,
+        match self.items.iter().position(|i| i.id == id.0) {
+            Some(idx) => self.items[idx].amt >= amt.0,
             None => false,
         }
     }
@@ -145,10 +175,13 @@ struct InventoryUi;
 #[derive(Component)]
 struct InventorySlot(u32);
 
+#[derive(Component)]
+struct InventoryPointer(usize);
+
 fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: Res<UiAssets>) {
     let text_style = TextStyle {
         font: font.chunk.clone(),
-        font_size: 24.0,
+        font_size: 30.0,
         color: Color::BLACK,
     };
 
@@ -159,10 +192,13 @@ fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: 
         ..default()
     };
 
+    let placeholder = format!("{: <40}AMT:{:>3}", "Wood", 999); 
+
     commands
         .spawn((
             NodeBundle {
                 transform: Transform::from_xyz(0., 0., 80.),
+                visibility: Visibility { is_visible: true},
                 ..default()
             },
             InventoryUi,
@@ -177,15 +213,16 @@ fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: 
                     ..default()
                 })
                 .with_children(|parent| {
-                    for i in 0..15 {
-                        let offset: f32 = i as f32 * 26.0;
+                    // Empty slots for items
+                    for i in 0..1 {
+                        let offset: f32 = i as f32 * 20.0;
                         parent.spawn((
-                            TextBundle::from_section("", text_style.clone()).with_style(Style {
+                            TextBundle::from_section(placeholder.clone(), text_style.clone()).with_style(Style {
                                 align_self: AlignSelf::Center,
                                 position_type: PositionType::Absolute,
                                 position: UiRect {
                                     left: Val::Px(50.),
-                                    top: Val::Px(32. + offset),
+                                    top: Val::Px(49. + offset),
                                     ..default()
                                 },
                                 ..default()
@@ -194,6 +231,12 @@ fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: 
                         ));
                     }
                 });
+                // .with_children(|parent| {
+                //     parent.spawn(ImageBundle {
+                //         image: UiImage(elements.)
+                //     }),
+                //     InventoryPointer(0)
+                // });
         });
 }
 
@@ -202,7 +245,7 @@ pub struct InventoryUpdate;
 fn ui_inventory_update(
     mut ev_invopen: EventReader<InventoryUpdate>,
     mut ui_slots_q: Query<&mut Text, With<InventorySlot>>,
-    inv_q: Query<&mut Inventory, With<Player>>,
+    inv_q: Query<&Inventory, With<Player>>,
     item_db: Res<ItemDatabase>,
 ) {
     for _ in ev_invopen.iter() {
@@ -212,12 +255,13 @@ fn ui_inventory_update(
         };
 
         let mut filled_in: usize = 0;
-        for (mut text, (item_id, qty)) in ui_slots_q.iter_mut().zip(player_inv.items.iter()) {
-            if let Some(info) = item_db.items.get(item_id) {
-                text.sections[0].value = format!("{: <20}AMT:{:>3}", info.name, qty.0);
+        for (mut text, InventoryItem{id, amt}) in ui_slots_q.iter_mut().zip(player_inv.items.iter()) {
+            if let Some(info) = item_db.items.get(&ItemId(*id)) {
+                text.sections[0].value = format!("{: <40}AMT:{:>3}", info.name, amt);
             } else {
-                text.sections[0].value = format!("{: <20}AMT:{:>3}", "undefined", "XXX");
+                text.sections[0].value = format!("{: <20}AMT:{:>3}", "undefined", amt);
             }
+
             filled_in += 1;
         }
         for mut text in ui_slots_q.iter_mut().skip(filled_in) {
@@ -226,7 +270,10 @@ fn ui_inventory_update(
     }
 }
 
+// Toggles the game to inventory mode, game is shifted into Menu state so the game world pauses
+// Will go between menu mode and running state
 fn toggle_inventory(
+    mut commands: Commands,
     mut inventory_ui_q: Query<&mut Visibility, With<InventoryUi>>,
     keeb: Res<Input<KeyCode>>,
     mut ev_invopen: EventWriter<InventoryUpdate>,
@@ -238,7 +285,31 @@ fn toggle_inventory(
     if let Ok(mut inventory_ui) = inventory_ui_q.get_single_mut() {
         inventory_ui.is_visible = !inventory_ui.is_visible;
         if inventory_ui.is_visible {
+            commands.insert_resource(NextState(GameState::Menu));
             ev_invopen.send(InventoryUpdate);
+        } else {
+            commands.insert_resource(NextState(GameState::Running));
+        }
+    }
+}
+
+// Moves what position in the inventory ui the player is currently pointing at
+// NOTE: need a way to get the item it is pointing at
+fn move_inventory_cursor(mut inv_pointer_q: Query<&mut InventoryPointer>, player_q: Query<&Inventory, With<Player>>, keeb: Res<Input<KeyCode>>) {
+    let player_inv = match player_q.get_single() {
+        Ok(e) => e,
+        Err(_) => panic!("Did not find a player inventory")
+    };
+
+    if let Ok(mut inv_pointer) = inv_pointer_q.get_single_mut() {
+        if keeb.just_pressed(KeyCode::S) {
+            if inv_pointer.0 < player_inv.max_size {
+                inv_pointer.0 += 1;
+            }
+        } else if keeb.just_pressed(KeyCode::W) {
+            if inv_pointer.0 > 0 {
+                inv_pointer.0 -= 1;
+            }
         }
     }
 }

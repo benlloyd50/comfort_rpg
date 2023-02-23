@@ -101,7 +101,7 @@ fn create_world(mut commands: Commands, tiles: Res<SpriteAssets>) {
         ObjectStorage,
         // Blocking,
     ));
-    
+
     create_item_tilestorage(commands, tiles);
 
     let duration = start.elapsed();
