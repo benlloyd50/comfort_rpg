@@ -214,8 +214,8 @@ fn create_inventory_ui(mut commands: Commands, font: Res<FontAssets>, elements: 
                 })
                 .with_children(|parent| {
                     // Empty slots for items
-                    for i in 0..1 {
-                        let offset: f32 = i as f32 * 20.0;
+                    for i in 0..18 {
+                        let offset: f32 = i as f32 * 25.0;
                         parent.spawn((
                             TextBundle::from_section(placeholder.clone(), text_style.clone()).with_style(Style {
                                 align_self: AlignSelf::Center,
