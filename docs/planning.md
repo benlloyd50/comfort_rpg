@@ -26,7 +26,7 @@
 - [X] Generate World
 - [X] Move Player around world
 - [X] Gather resources
-- [ ] Craft resources into materials then into deployables
+- [X] Craft resources into deployables
 - [ ] Build with the deployables
 
 ## Inventory
