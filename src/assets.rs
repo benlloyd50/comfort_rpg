@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 use bevy_asset_loader::prelude::*;
 
-use crate::AppState;
+use crate::GameState;
 pub struct AssetLoadPlugin;
 
 impl Plugin for AssetLoadPlugin {
     fn build(&self, app: &mut App) {
         app.add_loading_state(
-            LoadingState::new(AppState::AssetLoading)
-                .continue_to_state(AppState::GameLoading)
+            LoadingState::new(GameState::AssetLoading)
+                .continue_to_state(GameState::GameLoading)
                 .with_dynamic_collections::<StandardDynamicAssetCollection>(vec!["dynamic_asset.assets"])
                 .with_collection::<SpriteAssets>()
                 .with_collection::<FontAssets>()

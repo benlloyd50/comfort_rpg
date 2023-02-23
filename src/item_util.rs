@@ -6,7 +6,7 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
-use crate::{world_gen::ItemStorage, AppState};
+use crate::{world_gen::ItemStorage, GameState};
 use serde::Deserialize;
 use std::{error::Error, fs};
 
@@ -15,10 +15,10 @@ pub struct ItemUtilPlugin;
 impl Plugin for ItemUtilPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SpawnItemEvent>()
-            .add_enter_system(AppState::GameLoading, init_item_database)
+            .add_enter_system(GameState::GameLoading, init_item_database)
             .add_system(
                 spawn_item_at_xy
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .run_on_event::<SpawnItemEvent>(),
             );
     }

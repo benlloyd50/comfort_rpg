@@ -26,15 +26,16 @@ use bevy_ecs_tilemap::TilemapPlugin;
 use iyes_loopless::prelude::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum AppState {
+pub enum GameState {
     AssetLoading,
     GameLoading,
     Running,
+    Menu,
 }
 
 fn main() {
     App::new()
-        .add_loopless_state(AppState::AssetLoading) // Starting state which leads to the plugin doing its job first
+        .add_loopless_state(GameState::AssetLoading) // Starting state which leads to the plugin doing its job first
         .add_plugin(DefaultPluginsWithImage)
         .add_plugin(AssetLoadPlugin)
         .add_plugin(TilemapPlugin)
@@ -45,14 +46,14 @@ fn main() {
         .add_plugin(ItemUtilPlugin)
         .add_plugin(InventoryPlugin)
         .add_plugin(CraftingPlugin)
-        .add_system(run_game.run_in_state(AppState::GameLoading))
+        .add_system(run_game.run_in_state(GameState::GameLoading))
         .add_system(bevy::window::close_on_esc)
         .run();
 }
 
 // Gets the state out of Game Loading once everything is finished
 fn run_game(mut commands: Commands) {
-    commands.insert_resource(NextState(AppState::Running));
+    commands.insert_resource(NextState(GameState::Running));
 }
 
 struct DefaultPluginsWithImage;

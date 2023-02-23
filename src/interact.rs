@@ -6,7 +6,7 @@ use crate::{
     item_util::{ItemId, SpawnItemEvent},
     player::SystemOrder,
     world_gen::{Blocking, ObjectSize},
-    AppState,
+    GameState,
 };
 
 pub struct InteractPlugin;
@@ -18,7 +18,7 @@ impl Plugin for InteractPlugin {
             .add_system(cleanup_world_objs)
             .add_system(
                 harvest_interact_handler
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .label(SystemOrder::Logic)
                     .after(SystemOrder::Input),
             );

@@ -9,17 +9,17 @@ use crate::{
     item_util::{Item, ItemDatabase, ItemId, ItemQuantity},
     player::{Direction, Player, SystemOrder},
     world_gen::ItemStorage,
-    AppState,
+    GameState,
 };
 
 pub struct InventoryPlugin;
 
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, create_inventory_ui)
+        app.add_enter_system(GameState::GameLoading, create_inventory_ui)
             .add_system_set(
                 ConditionSet::new()
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .label(SystemOrder::Input)
                     .before(SystemOrder::Logic)
                     .with_system(take_item)
@@ -29,7 +29,7 @@ impl Plugin for InventoryPlugin {
             .add_event::<InventoryUpdate>()
             .add_system(
                 ui_inventory_update
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .run_on_event::<InventoryUpdate>(),
             );
     }

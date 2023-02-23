@@ -1,7 +1,6 @@
 use crate::{
-    effects::lerp,
     player::{Player, SystemOrder},
-    AppState,
+    GameState,
 };
 use bevy::{input::mouse::MouseWheel, prelude::*};
 use iyes_loopless::prelude::*;
@@ -12,9 +11,9 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, load_camera).add_system_set(
+        app.add_enter_system(GameState::GameLoading, load_camera).add_system_set(
             ConditionSet::new()
-                .run_in_state(AppState::Running)
+                .run_in_state(GameState::Running)
                 .label("graphicDelay")
                 .after(SystemOrder::Graphic)
                 .with_system(zoom_camera)
@@ -51,8 +50,7 @@ fn camera_follow_player(
     let mut cam_pos = camera.single_mut();
     let player_pos = player_q.single();
 
-    let lerped_pos = lerp(cam_pos.translation.truncate(), player_pos.translation.truncate(), 0.15);
-
+    cam_pos.translation = player_pos.translation;
     // Bound the position by the map so we dont see what's past it
     // let x_offset = cam_pos.scale.x * 39.5 * TILE_PIXELS_X;
     // let y_offset = cam_pos.scale.x * 39.5 * TILE_PIXELS_Y;
@@ -68,8 +66,6 @@ fn camera_follow_player(
     // } else {
     //     lerped_pos.y.clamp(y_bound, y_offset)
     // };
-
-    cam_pos.translation = Vec3::new(lerped_pos.x, lerped_pos.y, CAM_Z);
 }
 
 fn zoom_camera(

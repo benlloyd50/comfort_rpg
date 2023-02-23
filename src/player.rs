@@ -11,7 +11,7 @@ use crate::{
     interact::{HarvestInteraction, Interact},
     inventory::Inventory,
     world_gen::{within_bounds, Blocking, ObjectSize},
-    AppState,
+    GameState,
 };
 
 pub const PLAYER_Z: f32 = 50.0;
@@ -30,18 +30,18 @@ pub enum SystemOrder {
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         // Input => Logic => Graphic => cleanup
-        app.add_enter_system(AppState::GameLoading, setup_character.after("map"))
+        app.add_enter_system(GameState::GameLoading, setup_character.after("map"))
             .add_event::<MoveEvent>()
             .add_system(
                 move_player
-                    .run_in_state(AppState::Running)
-                    .run_if(movement_cooldown)
+                    .run_in_state(GameState::Running)
+                    // .run_if(movement_cooldown)
                     .label(SystemOrder::Logic)
                     .after(SystemOrder::Input),
             )
             .add_system_set(
                 ConditionSet::new()
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .label(SystemOrder::Input)
                     .before(SystemOrder::Logic)
                     .with_system(directional_input_handle)
@@ -50,13 +50,13 @@ impl Plugin for PlayerPlugin {
             )
             .add_system(
                 update_sprite_position::<Player>
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .label(SystemOrder::Graphic)
                     .after(SystemOrder::Logic),
             )
             .add_system(
                 move_target
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .label(SystemOrder::Graphic)
                     .after(SystemOrder::Logic),
             );
@@ -170,17 +170,17 @@ fn directional_input_handle(
 
     let mut dest_tile = Vec2::new(player_tile_pos.x as f32, player_tile_pos.y as f32);
     // else if here prevents dest_tile equalling zero delta
-    if keeb.pressed(KeyCode::W) {
+    if keeb.just_released(KeyCode::W) {
         dest_tile.y += PLAYER_TILE_SPEED as f32;
         *direction = Direction::Up;
-    } else if keeb.pressed(KeyCode::S) {
+    } else if keeb.just_released(KeyCode::S) {
         dest_tile.y -= PLAYER_TILE_SPEED as f32;
         *direction = Direction::Down;
     }
-    if keeb.pressed(KeyCode::D) {
+    if keeb.just_released(KeyCode::D) {
         dest_tile.x += PLAYER_TILE_SPEED as f32;
         *direction = Direction::Right;
-    } else if keeb.pressed(KeyCode::A) {
+    } else if keeb.just_released(KeyCode::A) {
         dest_tile.x -= PLAYER_TILE_SPEED as f32;
         *direction = Direction::Left;
     }

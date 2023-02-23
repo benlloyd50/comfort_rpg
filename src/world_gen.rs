@@ -14,7 +14,7 @@ use bevy_ecs_tilemap::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::{
-    assets::SpriteAssets, comfort_config::load_settings, constants::world_obj_sprites::*, interact::*, AppState,
+    assets::SpriteAssets, comfort_config::load_settings, constants::world_obj_sprites::*, interact::*, GameState,
 };
 
 pub const MAP_SIZE_X: u32 = 128; // Size of map currently only supports square maps
@@ -29,10 +29,10 @@ pub struct WorldGenerationPlugin;
 
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, create_world.label("map"))
+        app.add_enter_system(GameState::GameLoading, create_world.label("map"))
             .add_system_set(
                 ConditionSet::new()
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .with_system(regenerate_world)
                     .with_system(stretch_tree)
                     .into(),

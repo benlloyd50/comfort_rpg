@@ -7,19 +7,19 @@ use crate::{
     inventory::Inventory,
     item_util::{ItemId, ItemQuantity},
     player::Player,
-    AppState,
+    GameState,
 };
 
 pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_enter_system(AppState::GameLoading, init_recipe_database)
+        app.add_enter_system(GameState::GameLoading, init_recipe_database)
             .add_system(
                 handle_crafting_event
-                    .run_in_state(AppState::Running)
+                    .run_in_state(GameState::Running)
                     .run_on_event::<CraftItemEvent>(),
             )
-            .add_system(testcraft.run_in_state(AppState::Running))
+            .add_system(testcraft.run_in_state(GameState::Running))
             .add_event::<CraftItemEvent>();
     }
 }
